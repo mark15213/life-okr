@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎯 人生看板 (Life Dashboard)
 
-## Getting Started
+一个个人生活追踪看板系统,通过三个核心指标来量化和激励个人成长。
 
-First, run the development server:
+## 核心功能
+
+### 💪 俯卧撑余额系统
+- 抽一支烟:+100 俯卧撑
+- 运动一次:-100 俯卧撑
+- 余额为负数时可兑换为等额现金奖励
+- "大富翁"式财富等级系统
+
+### ⏱️ 专注时间追踪
+- 手动记录每日专注时长
+- 查看本周/本月平均专注时长
+
+### ✅ 任务完成追踪
+- 记录每日完成任务数
+- 查看本周/本月完成任务总数
+
+### 📊 数据趋势
+- 7天/30天数据趋势图表
+- 可视化你的进步轨迹
+
+## 技术栈
+
+- **框架**: Next.js 14 (App Router)
+- **语言**: TypeScript
+- **样式**: Tailwind CSS
+- **图表**: Recharts
+- **数据库**: Vercel Postgres
+- **部署**: Vercel
+
+## 开始使用
+
+### 1. 安装依赖
+
+```bash
+npm install
+```
+
+### 2. 配置环境变量
+
+复制 `.env.example` 到 `.env.local` 并填入你的 Vercel Postgres 连接信息:
+
+```bash
+cp .env.example .env.local
+```
+
+### 3. 初始化数据库
+
+```bash
+npm run setup-db
+```
+
+### 4. 启动开发服务器
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+访问 [http://localhost:3000](http://localhost:3000) 查看应用。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 部署到 Vercel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. 将代码推送到 GitHub
+2. 在 Vercel 导入项目
+3. 添加 Vercel Postgres 数据库
+4. 运行 `npm run setup-db` 初始化数据库
+5. 部署完成!
 
-## Learn More
+## 财富等级系统
 
-To learn more about Next.js, take a look at the following resources:
+| 余额范围 | 等级 | 主题 |
+|---------|------|------|
+| 0 ~ -500 | 💰 小金库 | 铜色主题 |
+| -500 ~ -1000 | 💎 储蓄达人 | 银色主题 |
+| -1000 ~ -2000 | 🏆 理财高手 | 金色主题 |
+| -2000 ~ -5000 | 👑 财富自由 | 紫金主题 |
+| -5000以上 | 🎰 大富翁 | 彩虹特效 |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
