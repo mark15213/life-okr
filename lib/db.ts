@@ -1,5 +1,7 @@
 import { sql } from '@vercel/postgres';
 
+const DEFAULT_DAYS = 7;
+
 export interface DailyRecord {
   id: number;
   date: string;
@@ -13,31 +15,54 @@ export interface DailyRecord {
 }
 
 export async function getTodayRecord(): Promise<DailyRecord | null> {
-  const today = new Date().toISOString().split('T')[0];
-  const { rows } = await sql<DailyRecord>`
-    SELECT * FROM daily_records WHERE date = ${today}
-  `;
-  return rows[0] || null;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const { rows } = await sql<DailyRecord>`
+      SELECT * FROM daily_records WHERE date = ${today}
+    `;
+    return rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching today\'s record:', error);
+    throw new Error('Failed to fetch today\'s record');
+  }
 }
 
-export async function getRecords(days: number = 7): Promise<DailyRecord[]> {
-  const { rows } = await sql<DailyRecord>`
-    SELECT * FROM daily_records
-    ORDER BY date DESC
-    LIMIT ${days}
-  `;
-  return rows;
+export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyRecord[]> {
+  try {
+    if (!Number.isInteger(days) || days <= 0) {
+      throw new Error('Days parameter must be a positive integer');
+    }
+
+    const { rows } = await sql<DailyRecord>`
+      SELECT * FROM daily_records
+      ORDER BY date DESC
+      LIMIT ${days}
+    `;
+    return rows;
+  } catch (error) {
+    console.error('Error fetching records:', error);
+    throw new Error('Failed to fetch records');
+  }
 }
 
 export async function ensureTodayRecord(): Promise<DailyRecord> {
-  const today = new Date().toISOString().split('T')[0];
+  try {
+    const today = new Date().toISOString().split('T')[0];
 
-  const { rows } = await sql<DailyRecord>`
-    INSERT INTO daily_records (date, cigarettes, exercises, pushup_balance, focus_minutes, tasks_completed)
-    VALUES (${today}, 0, 0, 0, 0, 0)
-    ON CONFLICT (date) DO UPDATE SET updated_at = NOW()
-    RETURNING *
-  `;
+    const { rows } = await sql<DailyRecord>`
+      INSERT INTO daily_records (date, cigarettes, exercises, pushup_balance, focus_minutes, tasks_completed)
+      VALUES (${today}, 0, 0, 0, 0, 0)
+      ON CONFLICT (date) DO UPDATE SET updated_at = NOW()
+      RETURNING *
+    `;
 
-  return rows[0];
+    if (!rows[0]) {
+      throw new Error('Failed to create or retrieve today\'s record');
+    }
+
+    return rows[0];
+  } catch (error) {
+    console.error('Error ensuring today\'s record:', error);
+    throw new Error('Failed to ensure today\'s record');
+  }
 }
