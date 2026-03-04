@@ -1,10 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRecords } from '@/lib/db';
 
+const MAX_DAYS = 365;
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const days = parseInt(searchParams.get('days') || '7');
+    const daysParam = searchParams.get('days') || '7';
+    const days = parseInt(daysParam);
+
+    // Validate days parameter
+    if (isNaN(days)) {
+      return NextResponse.json(
+        { error: 'Invalid days parameter: must be a number' },
+        { status: 400 }
+      );
+    }
+
+    // Check upper bound
+    if (days > MAX_DAYS) {
+      return NextResponse.json(
+        { error: `Invalid days parameter: must not exceed ${MAX_DAYS}` },
+        { status: 400 }
+      );
+    }
 
     const records = await getRecords(days);
 
