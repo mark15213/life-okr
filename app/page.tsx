@@ -1,65 +1,126 @@
-import Image from "next/image";
+'use client';
+
+import { useEffect, useState } from 'react';
+import PushupCard from '@/components/PushupCard';
+import FocusCard from '@/components/FocusCard';
+import TaskCard from '@/components/TaskCard';
+import TrendChart from '@/components/TrendChart';
+import { DailyRecord } from '@/lib/db';
 
 export default function Home() {
+  const [todayRecord, setTodayRecord] = useState<DailyRecord | null>(null);
+  const [records, setRecords] = useState<DailyRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    try {
+      const [todayRes, recordsRes] = await Promise.all([
+        fetch('/api/records/today'),
+        fetch('/api/records?days=30'),
+      ]);
+
+      const todayData = await todayRes.json();
+      const recordsData = await recordsRes.json();
+
+      setTodayRecord(todayData.record);
+      setRecords(recordsData.records);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleCigarette = async () => {
+    await fetch('/api/records/cigarette', { method: 'POST' });
+    await fetchData();
+  };
+
+  const handleExercise = async () => {
+    await fetch('/api/records/exercise', { method: 'POST' });
+    await fetchData();
+  };
+
+  const handleAddFocus = async (minutes: number) => {
+    await fetch('/api/records/focus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ minutes }),
+    });
+    await fetchData();
+  };
+
+  const handleAddTask = async () => {
+    await fetch('/api/records/task', { method: 'POST' });
+    await fetchData();
+  };
+
+  const calculateWeeklyAverage = (field: keyof DailyRecord) => {
+    const weekRecords = records.slice(0, 7);
+    if (weekRecords.length === 0) return 0;
+    const sum = weekRecords.reduce((acc, r) => acc + (r[field] as number), 0);
+    return Math.round(sum / weekRecords.length);
+  };
+
+  const calculateMonthlyAverage = (field: keyof DailyRecord) => {
+    const monthRecords = records.slice(0, 30);
+    if (monthRecords.length === 0) return 0;
+    const sum = monthRecords.reduce((acc, r) => acc + (r[field] as number), 0);
+    return Math.round(sum / monthRecords.length);
+  };
+
+  const calculateTotal = (field: keyof DailyRecord, days: number) => {
+    const selectedRecords = records.slice(0, days);
+    return selectedRecords.reduce((acc, r) => acc + (r[field] as number), 0);
+  };
+
+  if (loading || !todayRecord) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+        <div className="text-2xl font-bold text-gray-600">加载中...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <header className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-gray-800 mb-2">🎯 人生看板</h1>
+          <p className="text-gray-600">追踪你的成长，见证每一天的进步</p>
+        </header>
+
+        {/* Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+          <PushupCard
+            balance={todayRecord.pushup_balance}
+            cigarettes={todayRecord.cigarettes}
+            exercises={todayRecord.exercises}
+            onCigarette={handleCigarette}
+            onExercise={handleExercise}
+          />
+          <FocusCard
+            todayMinutes={todayRecord.focus_minutes}
+            weeklyAverage={calculateWeeklyAverage('focus_minutes')}
+            monthlyAverage={calculateMonthlyAverage('focus_minutes')}
+            onAddFocus={handleAddFocus}
+          />
+          <TaskCard
+            todayTasks={todayRecord.tasks_completed}
+            weeklyTotal={calculateTotal('tasks_completed', 7)}
+            monthlyTotal={calculateTotal('tasks_completed', 30)}
+            onAddTask={handleAddTask}
+          />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        {/* Trend Chart */}
+        <TrendChart records={records} />
+      </div>
+    </main>
   );
 }
