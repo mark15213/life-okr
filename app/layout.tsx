@@ -8,7 +8,7 @@ const gothicFont = UnifrakturMaguntia({ weight: '400', subsets: ['latin'], varia
 const typewriterFont = Special_Elite({ weight: '400', subsets: ['latin'], variable: '--font-typewriter' });
 
 export const metadata: Metadata = {
-  title: 'Hustle!!',
+  title: 'Hustle.',
   description: 'Personal tracking dashboard',
 };
 
