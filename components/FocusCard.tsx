@@ -79,14 +79,14 @@ export default function FocusCard({
             onChange={(e) => setMinutes(e.target.value)}
             placeholder="Add minutes..."
             min="1"
-            className="flex-1 bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder-zinc-400 px-4 py-3 rounded-2xl font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all"
-            disabled={loading}
+            className="flex-1 bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder-zinc-400 px-4 py-3 rounded-2xl font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading || !isAuthed}
           />
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            whileHover={isAuthed && minutes ? { scale: 1.02 } : {}}
+            whileTap={isAuthed && minutes ? { scale: 0.98 } : {}}
             type="submit"
-            disabled={loading || !minutes}
+            disabled={loading || !minutes || !isAuthed}
             className="bg-zinc-900 hover:bg-zinc-800 text-white px-5 py-3 rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             <Plus className="w-5 h-5" />
