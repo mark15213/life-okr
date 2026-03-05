@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 import { ensureTodayRecord } from '@/lib/db';
+
+const sql = neon(process.env.POSTGRES_URL!);
 
 export async function POST() {
   try {
@@ -8,7 +10,7 @@ export async function POST() {
 
     const today = new Date().toISOString().split('T')[0];
 
-    const { rows } = await sql`
+    const rows = await sql`
       UPDATE daily_records
       SET
         tasks_completed = tasks_completed + 1,

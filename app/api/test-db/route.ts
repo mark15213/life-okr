@@ -1,5 +1,7 @@
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 import { NextResponse } from 'next/server';
+
+const sql = neon(process.env.POSTGRES_URL!);
 
 export async function GET() {
   const results: any = {
@@ -9,7 +11,7 @@ export async function GET() {
 
   // Test 1: Database connection
   try {
-    const { rows } = await sql`SELECT NOW() as current_time`;
+    const rows = await sql`SELECT NOW() as current_time`;
     results.tests.connection = {
       status: 'success',
       message: 'Database connection successful',
@@ -26,7 +28,7 @@ export async function GET() {
 
   // Test 2: Check if table exists
   try {
-    const { rows } = await sql`
+    const rows = await sql`
       SELECT EXISTS (
         SELECT FROM information_schema.tables
         WHERE table_name = 'daily_records'
@@ -50,7 +52,7 @@ export async function GET() {
   // Test 3: Try to query the table
   if (results.tests.tableExists?.exists) {
     try {
-      const { rows } = await sql`SELECT COUNT(*) as count FROM daily_records`;
+      const rows = await sql`SELECT COUNT(*) as count FROM daily_records`;
       results.tests.queryTable = {
         status: 'success',
         message: 'Successfully queried daily_records table',
