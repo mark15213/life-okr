@@ -10,6 +10,7 @@ interface TaskCardProps {
   weeklyTotal: number;
   monthlyTotal: number;
   onAddTask: () => Promise<void>;
+  isAuthed: boolean;
 }
 
 export default function TaskCard({
@@ -17,10 +18,12 @@ export default function TaskCard({
   weeklyTotal,
   monthlyTotal,
   onAddTask,
+  isAuthed,
 }: TaskCardProps) {
   const [loading, setLoading] = useState(false);
 
   const handleAddTask = async () => {
+    if (!isAuthed) return;
     setLoading(true);
     await onAddTask();
     setLoading(false);

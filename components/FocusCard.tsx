@@ -10,6 +10,7 @@ interface FocusCardProps {
   weeklyAverage: number;
   monthlyAverage: number;
   onAddFocus: (minutes: number) => Promise<void>;
+  isAuthed: boolean;
 }
 
 export default function FocusCard({
@@ -17,6 +18,7 @@ export default function FocusCard({
   weeklyAverage,
   monthlyAverage,
   onAddFocus,
+  isAuthed,
 }: FocusCardProps) {
   const [minutes, setMinutes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,7 +26,7 @@ export default function FocusCard({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const value = parseInt(minutes);
-    if (value > 0) {
+    if (value > 0 && isAuthed) {
       setLoading(true);
       await onAddFocus(value);
       setMinutes('');

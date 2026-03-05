@@ -27,6 +27,21 @@ async function setupDatabase() {
       CREATE INDEX IF NOT EXISTS idx_daily_records_date ON daily_records(date DESC)
     `;
 
+    console.log('Creating vault_purchases table...');
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS vault_purchases (
+        id SERIAL PRIMARY KEY,
+        item_name VARCHAR NOT NULL,
+        cost INT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+
+    await sql`
+      CREATE INDEX IF NOT EXISTS idx_vault_purchases_created_at ON vault_purchases(created_at DESC)
+    `;
+
     console.log('✅ Database setup complete!');
   } catch (error) {
     console.error('❌ Error setting up database:', error);
