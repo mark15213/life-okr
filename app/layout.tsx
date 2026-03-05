@@ -5,8 +5,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: '人生看板 - Life Dashboard',
-  description: '追踪你的成长，见证每一天的进步',
+  title: 'Data Panel',
+  description: 'Personal tracking dashboard',
 };
 
 export default function RootLayout({

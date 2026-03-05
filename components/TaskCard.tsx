@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { CheckCircle2, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
   todayTasks: number;
@@ -24,44 +27,62 @@ export default function TaskCard({
   };
 
   return (
-    <div className="rounded-3xl p-8 bg-gradient-to-br from-purple-500 to-pink-600 border-4 border-purple-400 shadow-2xl shadow-purple-500/50">
-      {/* Header */}
-      <div className="text-center mb-6">
-        <div className="text-5xl mb-3">✅</div>
-        <h2 className="text-white text-xl font-semibold">任务完成</h2>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
+      whileHover={{ y: -5, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.05)" }}
+      className="relative rounded-3xl p-8 bg-white/80 backdrop-blur-xl border border-zinc-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-500 overflow-hidden flex flex-col justify-between"
+    >
+      {/* Top Header Area */}
+      <div className="flex justify-between items-start mb-8">
+        <h2 className="text-zinc-500 text-sm font-semibold uppercase tracking-widest flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-zinc-400" />
+          Tasks Completed
+        </h2>
       </div>
 
-      {/* Today's Task Count */}
-      <div className="text-center mb-6">
-        <div className="text-6xl font-bold text-white mb-2 animate-bounce">
+      {/* Main Task Count Display */}
+      <div className="text-center mb-8 flex-1 flex flex-col justify-center">
+        <motion.div
+          key={todayTasks}
+          initial={{ scale: 1.1, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-7xl font-light text-zinc-900 tracking-tight"
+        >
           {todayTasks}
-        </div>
-        <div className="text-purple-100 text-sm">今日完成</div>
+        </motion.div>
+        <div className="mt-2 text-sm text-zinc-400 font-medium">Today's Tasks</div>
       </div>
 
       {/* Add Task Button */}
-      <button
-        onClick={handleAddTask}
-        disabled={loading}
-        className="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-800 font-bold py-4 px-6 rounded-2xl shadow-lg transform hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed mb-6"
-      >
-        <span className="text-2xl mr-2">➕</span>
-        <span>完成一个任务</span>
-      </button>
+      <div className="mb-6 h-[46px] flex items-center justify-center">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={handleAddTask}
+          disabled={loading}
+          className="w-full h-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+        >
+          <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
+          <span>Complete a Task</span>
+        </motion.button>
+      </div>
 
-      {/* Statistics */}
-      <div className="bg-white/20 rounded-xl p-4 text-white">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold">{weeklyTotal}</div>
-            <div className="text-xs">本周完成</div>
+      {/* Statistics Footer */}
+      <div className="pt-5 border-t border-zinc-100 flex justify-between items-center text-zinc-500">
+        <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Totals</div>
+        <div className="flex gap-6 text-sm">
+          <div className="flex flex-col items-end">
+            <span className="font-medium text-zinc-700">{weeklyTotal}</span>
+            <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Week</span>
           </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold">{monthlyTotal}</div>
-            <div className="text-xs">本月完成</div>
+          <div className="flex flex-col items-end">
+            <span className="font-medium text-zinc-700">{monthlyTotal}</span>
+            <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Month</span>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

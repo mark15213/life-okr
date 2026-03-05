@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import PushupCard from '@/components/PushupCard';
 import FocusCard from '@/components/FocusCard';
 import TaskCard from '@/components/TaskCard';
-import TrendChart from '@/components/TrendChart';
 import { DailyRecord } from '@/lib/db';
+import { BarChart2 } from 'lucide-react';
 
 export default function Home() {
   const [todayRecord, setTodayRecord] = useState<DailyRecord | null>(null);
@@ -80,19 +81,41 @@ export default function Home() {
 
   if (loading || !todayRecord) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="text-2xl font-bold text-gray-600">加载中...</div>
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-zinc-300 border-t-zinc-800 rounded-full animate-spin"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <header className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-800 mb-2">🎯 人生看板</h1>
-          <p className="text-gray-600">追踪你的成长，见证每一天的进步</p>
+    <main className="min-h-screen bg-zinc-50 relative overflow-hidden font-sans text-zinc-900 selection:bg-zinc-200">
+      {/* Premium Texture & Subtle Mesh Gradients */}
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] mix-blend-multiply pointer-events-none" />
+      <div className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-gradient-to-br from-blue-100/40 to-transparent blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-tl from-stone-200/50 to-transparent blur-3xl pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto relative z-10 px-4 sm:px-8 py-12 md:py-20">
+        {/* Minimal & Elegant Header */}
+        <header className="mb-16 flex items-end justify-between border-b border-zinc-200 pb-6">
+          <div>
+            <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-zinc-900">
+              Data Panel
+            </h1>
+          </div>
+          <div className="flex items-center gap-6">
+            <Link
+              href="/analytics"
+              className="flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors uppercase tracking-widest"
+            >
+              <BarChart2 className="w-4 h-4" />
+              Analytics
+            </Link>
+            <div className="text-sm font-medium text-zinc-500 uppercase tracking-widest hidden sm:block">
+              {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </div>
+          </div>
         </header>
 
         {/* Cards Grid */}
@@ -117,9 +140,6 @@ export default function Home() {
             onAddTask={handleAddTask}
           />
         </div>
-
-        {/* Trend Chart */}
-        <TrendChart records={records} />
       </div>
     </main>
   );
