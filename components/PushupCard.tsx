@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { getWealthLevel, getProgressToNextLevel } from '@/lib/wealth-levels';
+import { getProgressToNextLevel } from '@/lib/wealth-levels';
 
 interface PushupCardProps {
   balance: number;

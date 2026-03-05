@@ -1,6 +1,9 @@
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 
 const DEFAULT_DAYS = 7;
+
+// Initialize database connection
+const sql = neon(process.env.POSTGRES_URL!);
 
 export interface DailyRecord {
   id: number;
@@ -17,7 +20,7 @@ export interface DailyRecord {
 export async function getTodayRecord(): Promise<DailyRecord | null> {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const { rows } = await sql<DailyRecord>`
+    const rows = await sql<DailyRecord[]>`
       SELECT * FROM daily_records WHERE date = ${today}
     `;
     return rows[0] || null;
@@ -33,7 +36,7 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
       throw new Error('Days parameter must be a positive integer');
     }
 
-    const { rows } = await sql<DailyRecord>`
+    const rows = await sql<DailyRecord[]>`
       SELECT * FROM daily_records
       ORDER BY date DESC
       LIMIT ${days}
@@ -49,7 +52,7 @@ export async function ensureTodayRecord(): Promise<DailyRecord> {
   try {
     const today = new Date().toISOString().split('T')[0];
 
-    const { rows } = await sql<DailyRecord>`
+    const rows = await sql<DailyRecord[]>`
       INSERT INTO daily_records (date, cigarettes, exercises, pushup_balance, focus_minutes, tasks_completed)
       VALUES (${today}, 0, 0, 0, 0, 0)
       ON CONFLICT (date) DO UPDATE SET updated_at = NOW()

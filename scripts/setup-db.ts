@@ -1,4 +1,6 @@
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.POSTGRES_URL!);
 
 async function setupDatabase() {
   try {
@@ -8,11 +10,11 @@ async function setupDatabase() {
       CREATE TABLE IF NOT EXISTS daily_records (
         id SERIAL PRIMARY KEY,
         date DATE NOT NULL UNIQUE,
-        cigarettes INT DEFAULT 0,
-        exercises INT DEFAULT 0,
-        pushup_balance INT DEFAULT 0,
-        focus_minutes INT DEFAULT 0,
-        tasks_completed INT DEFAULT 0,
+        cigarettes INT NOT NULL DEFAULT 0,
+        exercises INT NOT NULL DEFAULT 0,
+        pushup_balance INT NOT NULL DEFAULT 0,
+        focus_minutes INT NOT NULL DEFAULT 0,
+        tasks_completed INT NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
