@@ -20,10 +20,10 @@ export interface DailyRecord {
 export async function getTodayRecord(): Promise<DailyRecord | null> {
   try {
     const today = new Date().toISOString().split('T')[0];
-    const rows = await sql<DailyRecord[]>`
+    const rows = await sql`
       SELECT * FROM daily_records WHERE date = ${today}
     `;
-    return rows[0] || null;
+    return (rows[0] as DailyRecord) || null;
   } catch (error) {
     console.error('Error fetching today\'s record:', error);
     throw new Error('Failed to fetch today\'s record');
@@ -36,12 +36,12 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
       throw new Error('Days parameter must be a positive integer');
     }
 
-    const rows = await sql<DailyRecord[]>`
+    const rows = await sql`
       SELECT * FROM daily_records
       ORDER BY date DESC
       LIMIT ${days}
     `;
-    return rows;
+    return rows as DailyRecord[];
   } catch (error) {
     console.error('Error fetching records:', error);
     throw new Error('Failed to fetch records');
@@ -52,7 +52,7 @@ export async function ensureTodayRecord(): Promise<DailyRecord> {
   try {
     const today = new Date().toISOString().split('T')[0];
 
-    const rows = await sql<DailyRecord[]>`
+    const rows = await sql`
       INSERT INTO daily_records (date, cigarettes, exercises, pushup_balance, focus_minutes, tasks_completed)
       VALUES (${today}, 0, 0, 0, 0, 0)
       ON CONFLICT (date) DO UPDATE SET updated_at = NOW()
@@ -63,7 +63,7 @@ export async function ensureTodayRecord(): Promise<DailyRecord> {
       throw new Error('Failed to create or retrieve today\'s record');
     }
 
-    return rows[0];
+    return rows[0] as DailyRecord;
   } catch (error) {
     console.error('Error ensuring today\'s record:', error);
     throw new Error('Failed to ensure today\'s record');
