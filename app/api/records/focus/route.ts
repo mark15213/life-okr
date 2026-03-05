@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
-import { ensureTodayRecord } from '@/lib/db';
-
-const sql = neon(process.env.POSTGRES_URL!);
+import { ensureTodayRecord, sql } from '@/lib/db';
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,6 +1,9 @@
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
+import dotenv from 'dotenv';
 
-const sql = neon(process.env.POSTGRES_URL!);
+dotenv.config({ path: '.env.local' });
+
+const sql = postgres(process.env.POSTGRES_URL!);
 
 async function setupDatabase() {
   try {

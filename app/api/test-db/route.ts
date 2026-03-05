@@ -1,7 +1,7 @@
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
 import { NextResponse } from 'next/server';
 
-const sql = neon(process.env.POSTGRES_URL!);
+const sql = postgres(process.env.POSTGRES_URL!);
 
 export async function GET() {
   const results: any = {

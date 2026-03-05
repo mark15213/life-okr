@@ -1,9 +1,9 @@
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
 
 const DEFAULT_DAYS = 7;
 
 // Initialize database connection
-const sql = neon(process.env.POSTGRES_URL!);
+export const sql = postgres(process.env.POSTGRES_URL!);
 
 export interface DailyRecord {
   id: number;
@@ -23,7 +23,7 @@ export async function getTodayRecord(): Promise<DailyRecord | null> {
     const rows = await sql`
       SELECT * FROM daily_records WHERE date = ${today}
     `;
-    return (rows[0] as DailyRecord) || null;
+    return (rows[0] as unknown as DailyRecord) || null;
   } catch (error) {
     console.error('Error fetching today\'s record:', error);
     throw new Error('Failed to fetch today\'s record');
@@ -41,7 +41,7 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
       ORDER BY date DESC
       LIMIT ${days}
     `;
-    return rows as DailyRecord[];
+    return rows as unknown as DailyRecord[];
   } catch (error) {
     console.error('Error fetching records:', error);
     throw new Error('Failed to fetch records');
@@ -63,7 +63,7 @@ export async function ensureTodayRecord(): Promise<DailyRecord> {
       throw new Error('Failed to create or retrieve today\'s record');
     }
 
-    return rows[0] as DailyRecord;
+    return rows[0] as unknown as DailyRecord;
   } catch (error) {
     console.error('Error ensuring today\'s record:', error);
     throw new Error('Failed to ensure today\'s record');
