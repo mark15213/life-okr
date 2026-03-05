@@ -55,8 +55,12 @@ export default function Home() {
     await fetchData();
   };
 
-  const handleExercise = async () => {
-    await fetch('/api/records/exercise', { method: 'POST' });
+  const handleExercise = async (calories: number) => {
+    await fetch('/api/records/exercise', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ calories }),
+    });
     await fetchData();
   };
 

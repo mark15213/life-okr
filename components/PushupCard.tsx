@@ -9,7 +9,7 @@ interface PushupCardProps {
   cigarettes: number;
   exercises: number;
   onCigarette: () => Promise<void>;
-  onExercise: () => Promise<void>;
+  onExercise: (calories: number) => Promise<void>;
   isAuthed: boolean;
 }
 
@@ -22,11 +22,15 @@ export default function PushupCard({
   isAuthed,
 }: PushupCardProps) {
   const [loading, setLoading] = useState(false);
+  const [calories, setCalories] = useState<string>('');
 
   // Dynamic title: positive balance means smoking debt, negative means workout surplus
   const isDebt = balance > 0;
   const cardTitle = isDebt ? 'Smoking Debt' : 'Workout Surplus';
   const displayValue = Math.abs(balance);
+
+  // If true, the user has clicked "Workout" and is being prompted for calories
+  const [showCaloriesInput, setShowCaloriesInput] = useState(false);
 
   const handleCigarette = async () => {
     if (!isAuthed) return;
@@ -35,10 +39,19 @@ export default function PushupCard({
     setLoading(false);
   };
 
-  const handleExercise = async () => {
+  const handleExerciseClick = () => {
     if (!isAuthed) return;
+    setShowCaloriesInput(true);
+  };
+
+  const submitExercise = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!isAuthed) return;
+
     setLoading(true);
-    await onExercise();
+    await onExercise(Number(calories) || 0);
+    setCalories('');
+    setShowCaloriesInput(false);
     setLoading(false);
   };
 
@@ -78,13 +91,13 @@ export default function PushupCard({
       </div>
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
+      <div className="grid grid-cols-2 gap-3 mb-6 relative">
         <motion.button
           whileHover={isAuthed ? { scale: 1.02 } : {}}
           whileTap={isAuthed ? { scale: 0.98 } : {}}
           onClick={handleCigarette}
-          disabled={loading || !isAuthed}
-          className="flex flex-col items-center justify-center gap-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium py-3 px-4 rounded-2xl border border-zinc-200/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
+          disabled={loading || !isAuthed || showCaloriesInput}
+          className="flex flex-col items-center justify-center gap-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium py-3 px-4 rounded-2xl border border-zinc-200/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed group h-20"
         >
           <Cigarette className="w-5 h-5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
           <div className="flex items-center gap-1 text-sm">
@@ -93,19 +106,68 @@ export default function PushupCard({
           </div>
         </motion.button>
 
-        <motion.button
-          whileHover={isAuthed ? { scale: 1.02 } : {}}
-          whileTap={isAuthed ? { scale: 0.98 } : {}}
-          onClick={handleExercise}
-          disabled={loading || !isAuthed}
-          className="flex flex-col items-center justify-center gap-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium py-3 px-4 rounded-2xl border border-zinc-200/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed group"
-        >
-          <Dumbbell className="w-5 h-5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
-          <div className="flex items-center gap-1 text-sm">
-            <span>Workout</span>
-            <span className="text-xs text-zinc-400">-100</span>
-          </div>
-        </motion.button>
+        <div className="relative h-20">
+          <AnimatePresence mode="wait">
+            {!showCaloriesInput ? (
+              <motion.button
+                key="btn"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.15 }}
+                whileHover={isAuthed ? { scale: 1.02 } : {}}
+                whileTap={isAuthed ? { scale: 0.98 } : {}}
+                onClick={handleExerciseClick}
+                disabled={loading || !isAuthed}
+                className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium py-3 px-4 rounded-2xl border border-zinc-200/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed group absolute inset-0"
+              >
+                <Dumbbell className="w-5 h-5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
+                <div className="flex items-center gap-1 text-sm">
+                  <span>Workout</span>
+                  <span className="text-xs text-zinc-400">-100</span>
+                </div>
+              </motion.button>
+            ) : (
+              <motion.form
+                key="input"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.15 }}
+                onSubmit={submitExercise}
+                className="w-full h-full flex flex-col gap-1 absolute inset-0 bg-white rounded-2xl border border-zinc-200 p-2 shadow-sm"
+              >
+                <input
+                  type="number"
+                  autoFocus
+                  value={calories}
+                  onChange={(e) => setCalories(e.target.value)}
+                  placeholder="Calories?"
+                  min="0"
+                  disabled={loading}
+                  className="w-full bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder-zinc-400 px-2 flex-1 text-sm rounded-lg font-medium focus:outline-none focus:ring-1 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all text-center"
+                />
+                <div className="flex gap-1 h-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowCaloriesInput(false)}
+                    disabled={loading}
+                    className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-md text-[10px] uppercase font-bold tracking-wider transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white rounded-md text-[10px] uppercase font-bold tracking-wider transition-colors disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                </div>
+              </motion.form>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
       {/* Today's Stats Footer */}

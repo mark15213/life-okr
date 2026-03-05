@@ -13,6 +13,7 @@ export interface DailyRecord {
   pushup_balance: number;
   focus_minutes: number;
   tasks_completed: number;
+  calories_burned: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -53,8 +54,8 @@ export async function ensureTodayRecord(): Promise<DailyRecord> {
     const today = new Date().toISOString().split('T')[0];
 
     const rows = await sql`
-      INSERT INTO daily_records (date, cigarettes, exercises, pushup_balance, focus_minutes, tasks_completed)
-      VALUES (${today}, 0, 0, 0, 0, 0)
+      INSERT INTO daily_records (date, cigarettes, exercises, pushup_balance, focus_minutes, tasks_completed, calories_burned)
+      VALUES (${today}, 0, 0, 0, 0, 0, 0)
       ON CONFLICT (date) DO UPDATE SET updated_at = NOW()
       RETURNING *
     `;

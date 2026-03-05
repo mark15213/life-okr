@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { ensureTodayRecord, sql } from '@/lib/db';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
+    const body = await req.json().catch(() => ({}));
+    const calories = typeof body.calories === 'number' ? body.calories : 0;
+
     await ensureTodayRecord();
 
     const today = new Date().toISOString().split('T')[0];
@@ -12,6 +15,7 @@ export async function POST() {
       SET
         exercises = exercises + 1,
         pushup_balance = pushup_balance - 100,
+        calories_burned = calories_burned + ${calories},
         updated_at = NOW()
       WHERE date = ${today}
       RETURNING *

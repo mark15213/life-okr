@@ -18,6 +18,7 @@ async function setupDatabase() {
         pushup_balance INT NOT NULL DEFAULT 0,
         focus_minutes INT NOT NULL DEFAULT 0,
         tasks_completed INT NOT NULL DEFAULT 0,
+        calories_burned INT NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       )
