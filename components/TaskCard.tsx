@@ -61,10 +61,10 @@ export default function TaskCard({
       {/* Add Task Button */}
       <div className="mb-6 h-[46px] flex items-center justify-center">
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={isAuthed ? { scale: 1.02 } : {}}
+          whileTap={isAuthed ? { scale: 0.98 } : {}}
           onClick={handleAddTask}
-          disabled={loading}
+          disabled={loading || !isAuthed}
           className="w-full h-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
         >
           <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
