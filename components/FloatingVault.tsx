@@ -227,7 +227,7 @@ export default function FloatingVault({ records, todayRecord, isAuthed }: Floati
                                         />
                                         <button
                                             type="submit"
-                                            disabled={isSubmitting || !newItemName || !newItemCost || parseInt(newItemCost) > vault.balance}
+                                            disabled={isSubmitting || !newItemName || !newItemCost}
                                             className="px-4 py-2 bg-zinc-900 text-white font-medium rounded-xl text-sm hover:bg-zinc-800 disabled:opacity-50 transition-colors flex items-center gap-1"
                                         >
                                             <Plus className="w-4 h-4" /> Add
