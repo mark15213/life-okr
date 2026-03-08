@@ -182,7 +182,7 @@ export default function Home() {
         </div>
 
         {/* Floating Reward Vault Widget */}
-        <FloatingVault records={records} todayRecord={todayRecord} isAuthed={isAuthed} />
+        <FloatingVault records={records} todayRecord={todayRecord} cumulativeBalance={cumulativeBalance} isAuthed={isAuthed} />
       </div>
     </main>
   );

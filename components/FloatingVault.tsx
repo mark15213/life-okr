@@ -17,10 +17,11 @@ interface Purchase {
 interface FloatingVaultProps {
     records: DailyRecord[];
     todayRecord: DailyRecord;
+    cumulativeBalance: number;
     isAuthed: boolean;
 }
 
-export default function FloatingVault({ records, todayRecord, isAuthed }: FloatingVaultProps) {
+export default function FloatingVault({ records, todayRecord, cumulativeBalance, isAuthed }: FloatingVaultProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [purchases, setPurchases] = useState<Purchase[]>([]);
     const [newItemName, setNewItemName] = useState('');
@@ -28,16 +29,14 @@ export default function FloatingVault({ records, todayRecord, isAuthed }: Floati
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSparkle, setShowSparkle] = useState(false);
 
-    // Fetch purchases when modal opens
+    // Fetch purchases on mount
     useEffect(() => {
-        if (isOpen) {
-            fetch('/api/vault')
-                .then(res => res.json())
-                .then(data => {
-                    if (data.purchases) setPurchases(data.purchases);
-                });
-        }
-    }, [isOpen]);
+        fetch('/api/vault')
+            .then(res => res.json())
+            .then(data => {
+                if (data.purchases) setPurchases(data.purchases);
+            });
+    }, []);
 
     const handlePurchase = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -68,10 +67,14 @@ export default function FloatingVault({ records, todayRecord, isAuthed }: Floati
 
         let exerciseReward = 0;
         let qualifyingExercises = 0;
-        for (const r of allRecords) {
-            if (r.cigarettes === 0) qualifyingExercises += r.exercises;
+
+        // Only reward exercises if the user is out of pushup debt!
+        if (cumulativeBalance <= 0) {
+            for (const r of allRecords) {
+                if (r.cigarettes === 0) qualifyingExercises += r.exercises;
+            }
+            exerciseReward = Math.floor(qualifyingExercises / 2) * 100;
         }
-        exerciseReward = Math.floor(qualifyingExercises / 2) * 100;
 
         const totalTasks = allRecords.reduce((sum, r) => sum + r.tasks_completed, 0);
         const taskReward = Math.floor(totalTasks / 10) * 100;
@@ -94,7 +97,7 @@ export default function FloatingVault({ records, todayRecord, isAuthed }: Floati
             focusReward,
             totalFocusMinutes,
         };
-    }, [records, todayRecord, purchases]);
+    }, [records, todayRecord, purchases, cumulativeBalance]);
 
     // Milestone effect trigger
     useEffect(() => {
