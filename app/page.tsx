@@ -12,6 +12,7 @@ import { BarChart2, Lock, Unlock } from 'lucide-react';
 
 export default function Home() {
   const [todayRecord, setTodayRecord] = useState<DailyRecord | null>(null);
+  const [cumulativeBalance, setCumulativeBalance] = useState<number>(0);
   const [records, setRecords] = useState<DailyRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const { isAuthed, verify } = usePasscode();
@@ -29,6 +30,7 @@ export default function Home() {
       const recordsData = await recordsRes.json();
 
       setTodayRecord(todayData.record);
+      setCumulativeBalance(todayData.cumulativePushupBalance ?? todayData.record?.pushup_balance ?? 0);
       setRecords(recordsData.records);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -154,10 +156,9 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <PushupCard
-            balance={todayRecord.pushup_balance}
+            balance={cumulativeBalance}
             cigarettes={todayRecord.cigarettes}
             exercises={todayRecord.exercises}
             onCigarette={handleCigarette}

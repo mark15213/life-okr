@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTodayRecord, ensureTodayRecord } from '@/lib/db';
+import { getTodayRecord, ensureTodayRecord, getCumulativePushupBalance } from '@/lib/db';
 
 export async function GET() {
   try {
@@ -9,7 +9,9 @@ export async function GET() {
       record = await ensureTodayRecord();
     }
 
-    return NextResponse.json({ record });
+    const cumulativePushupBalance = await getCumulativePushupBalance();
+
+    return NextResponse.json({ record, cumulativePushupBalance });
   } catch (error) {
     console.error('Error fetching today record:', error);
     return NextResponse.json(

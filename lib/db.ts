@@ -70,3 +70,15 @@ export async function ensureTodayRecord(): Promise<DailyRecord> {
     throw new Error('Failed to ensure today\'s record');
   }
 }
+
+export async function getCumulativePushupBalance(): Promise<number> {
+  try {
+    const rows = await sql`
+      SELECT SUM(pushup_balance) as total FROM daily_records
+    `;
+    return Number(rows[0]?.total || 0);
+  } catch (error) {
+    console.error('Error fetching cumulative pushup balance:', error);
+    return 0;
+  }
+}
