@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import DashboardAnalytics from '@/components/DashboardAnalytics';
+import BackfillModal from '@/components/BackfillModal';
 import { DailyRecord } from '@/lib/db';
 import { ArrowLeft } from 'lucide-react';
 
@@ -10,7 +11,8 @@ export default function AnalyticsPage() {
     const [records, setRecords] = useState<DailyRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const fetchData = () => {
+        setLoading(true);
         fetch('/api/records?days=90')
             .then((res) => res.json())
             .then((data) => {
@@ -21,6 +23,10 @@ export default function AnalyticsPage() {
                 console.error('Error fetching records:', err);
                 setLoading(false);
             });
+    };
+
+    useEffect(() => {
+        fetchData();
     }, []);
 
     if (loading) {
@@ -49,6 +55,9 @@ export default function AnalyticsPage() {
                         <h1 className="text-4xl md:text-5xl font-semibold tracking-tight text-zinc-900">
                             Analytics
                         </h1>
+                    </div>
+                    <div className="flex items-center">
+                        <BackfillModal onSuccess={fetchData} />
                     </div>
                 </header>
 

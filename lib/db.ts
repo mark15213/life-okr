@@ -50,24 +50,27 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
 }
 
 export async function ensureTodayRecord(): Promise<DailyRecord> {
-  try {
-    const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+  return ensureRecord(today);
+}
 
+export async function ensureRecord(date: string): Promise<DailyRecord> {
+  try {
     const rows = await sql`
       INSERT INTO daily_records (date, cigarettes, exercises, pushup_balance, focus_minutes, tasks_completed, calories_burned)
-      VALUES (${today}, 0, 0, 0, 0, 0, 0)
+      VALUES (${date}, 0, 0, 0, 0, 0, 0)
       ON CONFLICT (date) DO UPDATE SET updated_at = NOW()
       RETURNING *
     `;
 
     if (!rows[0]) {
-      throw new Error('Failed to create or retrieve today\'s record');
+      throw new Error(`Failed to create or retrieve record for date: ${date}`);
     }
 
     return rows[0] as unknown as DailyRecord;
   } catch (error) {
-    console.error('Error ensuring today\'s record:', error);
-    throw new Error('Failed to ensure today\'s record');
+    console.error(`Error ensuring record for date: ${date}`, error);
+    throw new Error(`Failed to ensure record for ${date}`);
   }
 }
 
