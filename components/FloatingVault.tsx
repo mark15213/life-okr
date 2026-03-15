@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DailyRecord } from '@/lib/db';
-import { Gift, X, Plus, Clock, Lock, CheckCircle2, Dumbbell, Timer, Star } from 'lucide-react';
+import { Gift, X, Plus, Clock, Lock, CheckCircle2, Dumbbell, Timer, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePasscode } from '@/lib/usePasscode';
 
@@ -57,6 +57,22 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
             }
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleDeletePurchase = async (id: number) => {
+        if (!isAuthed) return;
+        if (!confirm('Are you sure you want to delete this purchase? Points will be refunded.')) return;
+
+        try {
+            const res = await fetch(`/api/vault?id=${id}`, {
+                method: 'DELETE',
+            });
+            if (res.ok) {
+                setPurchases(p => p.filter(purchase => purchase.id !== id));
+            }
+        } catch (error) {
+            console.error('Failed to delete purchase:', error);
         }
     };
 
@@ -262,7 +278,18 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
                                                         {new Date(p.created_at).toLocaleDateString()}
                                                     </span>
                                                 </div>
-                                                <span className="text-sm font-semibold text-zinc-900">-¥{p.cost}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-semibold text-zinc-900">-¥{p.cost}</span>
+                                                    {isAuthed && (
+                                                        <button
+                                                            onClick={() => handleDeletePurchase(p.id)}
+                                                            className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                                            title="Delete purchase"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         ))
                                     )}

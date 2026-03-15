@@ -53,8 +53,8 @@ export default function PeriodicBarChart({
             // Last 12 weeks
             for (let i = 11; i >= 0; i--) {
                 const d = subWeeks(today, i);
-                const weekStart = startOfWeek(d, { weekStartsOn: 1 });
-                const weekEnd = endOfWeek(d, { weekStartsOn: 1 });
+                const weekStart = startOfWeek(d, { weekStartsOn: 0 });
+                const weekEnd = endOfWeek(d, { weekStartsOn: 0 });
 
                 const weekRecords = sorted.filter(r => {
                     const rd = parseISO(r.date);

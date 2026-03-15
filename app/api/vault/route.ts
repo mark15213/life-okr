@@ -38,3 +38,29 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to create vault purchase' }, { status: 500 });
     }
 }
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get('id');
+
+        if (!id) {
+            return NextResponse.json({ error: 'Purchase ID is required' }, { status: 400 });
+        }
+
+        const rows = await sql`
+      DELETE FROM vault_purchases
+      WHERE id = ${id}
+      RETURNING *
+    `;
+
+        if (rows.length === 0) {
+            return NextResponse.json({ error: 'Purchase not found' }, { status: 404 });
+        }
+
+        return NextResponse.json({ success: true, deleted: rows[0] });
+    } catch (error) {
+        console.error('Error deleting vault purchase:', error);
+        return NextResponse.json({ error: 'Failed to delete vault purchase' }, { status: 500 });
+    }
+}

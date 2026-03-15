@@ -56,7 +56,7 @@ function ChangeIndicator({ change, invertColor = false }: { change: ReturnType<t
 }
 
 export default function DashboardAnalytics({ records }: DashboardAnalyticsProps) {
-    const [selectedMetric, setSelectedMetric] = useState<MetricType>('Calories');
+    const [selectedMetric, setSelectedMetric] = useState<MetricType>('Focus');
 
     const { todayData, yesterdayData, thisWeekData, lastWeekData } = useMemo(() => {
         const sorted = [...records].sort((a, b) =>
@@ -90,10 +90,10 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
         };
 
         // Weekly aggregation
-        const thisWeekStart = startOfWeek(today, { weekStartsOn: 1 });
-        const thisWeekEnd = endOfWeek(today, { weekStartsOn: 1 });
-        const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
-        const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
+        const thisWeekStart = startOfWeek(today, { weekStartsOn: 0 });
+        const thisWeekEnd = endOfWeek(today, { weekStartsOn: 0 });
+        const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 0 });
+        const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 0 });
 
         const thisWeekRecords = sorted.filter(r => {
             const d = new Date(r.date);
@@ -204,7 +204,7 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                     {/* Metric Selector & Single Chart */}
                     <div className="space-y-6">
                         <div className="flex flex-wrap items-center gap-2">
-                            {(['Calories', 'Exercises', 'Focus', 'Tasks'] as MetricType[]).map((metric) => (
+                            {(['Focus', 'Tasks', 'Exercises', 'Calories'] as MetricType[]).map((metric) => (
                                 <button
                                     key={metric}
                                     onClick={() => setSelectedMetric(metric)}
