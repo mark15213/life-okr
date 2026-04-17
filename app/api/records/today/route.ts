@@ -3,13 +3,14 @@ import { getTodayRecord, ensureTodayRecord, getCumulativePushupBalance } from '@
 
 export async function GET() {
   try {
-    let record = await getTodayRecord();
+    let [record, cumulativePushupBalance] = await Promise.all([
+      getTodayRecord(),
+      getCumulativePushupBalance()
+    ]);
 
     if (!record) {
       record = await ensureTodayRecord();
     }
-
-    const cumulativePushupBalance = await getCumulativePushupBalance();
 
     return NextResponse.json({ record, cumulativePushupBalance });
   } catch (error) {

@@ -6,42 +6,26 @@ import PushupCard from '@/components/PushupCard';
 import FocusCard from '@/components/FocusCard';
 import TaskCard from '@/components/TaskCard';
 import FloatingVault from '@/components/FloatingVault';
+import useSWR from 'swr';
 import { DailyRecord } from '@/lib/db';
 import { usePasscode } from '@/lib/usePasscode';
 import { BarChart2, Lock, Unlock } from 'lucide-react';
 
 export default function Home() {
-  const [todayRecord, setTodayRecord] = useState<DailyRecord | null>(null);
-  const [cumulativeBalance, setCumulativeBalance] = useState<number>(0);
-  const [records, setRecords] = useState<DailyRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const { isAuthed, verify } = usePasscode();
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
 
-  const fetchData = async () => {
-    try {
-      const [todayRes, recordsRes] = await Promise.all([
-        fetch('/api/records/today'),
-        fetch('/api/records?days=30'),
-      ]);
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
 
-      const todayData = await todayRes.json();
-      const recordsData = await recordsRes.json();
+  const { data: todayData, mutate: mutateToday } = useSWR('/api/records/today', fetcher);
+  const { data: recordsData, mutate: mutateRecords } = useSWR('/api/records?days=30', fetcher);
 
-      setTodayRecord(todayData.record);
-      setCumulativeBalance(todayData.cumulativePushupBalance ?? todayData.record?.pushup_balance ?? 0);
-      setRecords(recordsData.records);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loading = !todayData || !recordsData;
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const todayRecord: DailyRecord | null = todayData?.record || null;
+  const cumulativeBalance: number = todayData?.cumulativePushupBalance ?? todayData?.record?.pushup_balance ?? 0;
+  const records: DailyRecord[] = recordsData?.records || [];
 
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,31 +37,47 @@ export default function Home() {
   };
 
   const handleCigarette = async () => {
+    if (!todayRecord) return;
+    const optimisticRecord = { ...todayRecord, cigarettes: todayRecord.cigarettes + 1 };
+    mutateToday({ ...todayData, record: optimisticRecord }, false);
     await fetch('/api/records/cigarette', { method: 'POST' });
-    await fetchData();
+    mutateToday();
+    mutateRecords();
   };
 
   const handleExercise = async (calories: number) => {
+    if (!todayRecord) return;
+    const optimisticRecord = { ...todayRecord, exercises: todayRecord.exercises + 1 };
+    mutateToday({ ...todayData, record: optimisticRecord }, false);
     await fetch('/api/records/exercise', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ calories }),
     });
-    await fetchData();
+    mutateToday();
+    mutateRecords();
   };
 
   const handleAddFocus = async (minutes: number) => {
+    if (!todayRecord) return;
+    const optimisticRecord = { ...todayRecord, focus_minutes: todayRecord.focus_minutes + minutes };
+    mutateToday({ ...todayData, record: optimisticRecord }, false);
     await fetch('/api/records/focus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ minutes }),
     });
-    await fetchData();
+    mutateToday();
+    mutateRecords();
   };
 
   const handleAddTask = async () => {
+    if (!todayRecord) return;
+    const optimisticRecord = { ...todayRecord, tasks_completed: todayRecord.tasks_completed + 1 };
+    mutateToday({ ...todayData, record: optimisticRecord }, false);
     await fetch('/api/records/task', { method: 'POST' });
-    await fetchData();
+    mutateToday();
+    mutateRecords();
   };
 
   const calculateWeeklyAverage = (field: keyof DailyRecord) => {

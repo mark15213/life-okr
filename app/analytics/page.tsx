@@ -7,27 +7,18 @@ import BackfillModal from '@/components/BackfillModal';
 import { DailyRecord } from '@/lib/db';
 import { ArrowLeft } from 'lucide-react';
 
+import useSWR from 'swr';
+
 export default function AnalyticsPage() {
-    const [records, setRecords] = useState<DailyRecord[]>([]);
-    const [loading, setLoading] = useState(true);
+    const fetcher = (url: string) => fetch(url).then(res => res.json());
+    const { data, mutate } = useSWR('/api/records?days=365', fetcher);
+
+    const records = data?.records || [];
+    const loading = !data;
 
     const fetchData = () => {
-        setLoading(true);
-        fetch('/api/records?days=365')
-            .then((res) => res.json())
-            .then((data) => {
-                setRecords(data.records);
-                setLoading(false);
-            })
-            .catch((err) => {
-                console.error('Error fetching records:', err);
-                setLoading(false);
-            });
+        mutate();
     };
-
-    useEffect(() => {
-        fetchData();
-    }, []);
 
     if (loading) {
         return (

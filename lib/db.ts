@@ -3,7 +3,14 @@ import postgres from 'postgres';
 const DEFAULT_DAYS = 7;
 
 // Initialize database connection
-export const sql = postgres(process.env.POSTGRES_URL!);
+// In development, prevent hot reloads from creating multiple new connections
+const globalForPostgres = globalThis as unknown as {
+  postgresInstance: postgres.Sql | undefined;
+};
+
+export const sql = globalForPostgres.postgresInstance ?? postgres(process.env.POSTGRES_URL!);
+
+if (process.env.NODE_ENV !== 'production') globalForPostgres.postgresInstance = sql;
 
 export interface DailyRecord {
   id: number;
