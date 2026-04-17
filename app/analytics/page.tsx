@@ -13,7 +13,7 @@ export default function AnalyticsPage() {
 
     const fetchData = () => {
         setLoading(true);
-        fetch('/api/records?days=90')
+        fetch('/api/records?days=365')
             .then((res) => res.json())
             .then((data) => {
                 setRecords(data.records);
