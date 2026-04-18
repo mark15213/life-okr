@@ -205,7 +205,6 @@ function WeeklyDetailTable({ records, weekOffset }: { records: DailyRecord[]; we
 }
 
 export default function DashboardAnalytics({ records }: DashboardAnalyticsProps) {
-    const [deepDiveOpen, setDeepDiveOpen] = useState(false);
     const [deepDiveTab, setDeepDiveTab] = useState<DeepDiveTab>('chart');
     const [selectedChartMetric, setSelectedChartMetric] = useState<MetricKey>('focus');
     const [tableWeekOffset, setTableWeekOffset] = useState(0);
@@ -422,35 +421,16 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                 </motion.div>
             </section>
 
-            {/* ═══════════════ Section C: Deep Dive (Collapsible) ═══════════════ */}
+            {/* ═══════════════ Section C: Deep Dive ═══════════════ */}
             <section>
-                <button
-                    onClick={() => setDeepDiveOpen(!deepDiveOpen)}
-                    className="w-full flex items-center justify-between py-4 px-1 group"
-                >
+                <div className="w-full flex items-center justify-between py-4 px-1">
                     <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <Table2 className="w-4 h-4" />
                         Deep Dive
                     </h3>
-                    <motion.div
-                        animate={{ rotate: deepDiveOpen ? 180 : 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center text-zinc-400 group-hover:bg-zinc-200 group-hover:text-zinc-600 transition-colors"
-                    >
-                        <ChevronDown className="w-4 h-4" />
-                    </motion.div>
-                </button>
+                </div>
 
-                <AnimatePresence>
-                    {deepDiveOpen && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
-                            className="overflow-hidden"
-                        >
-                            <div className="space-y-6 pb-4">
+                <div className="space-y-6 pb-4">
                                 {/* Tab switcher */}
                                 <div className="flex bg-zinc-100/80 p-1 rounded-xl w-fit">
                                     <button
@@ -520,9 +500,7 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
 
                                 {/* Table sub-view */}
                                 {deepDiveTab === 'table' && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
+                                    <div
                                         className="bg-white/80 backdrop-blur-md rounded-2xl border border-zinc-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] overflow-hidden"
                                     >
                                         {/* Week navigator */}
@@ -551,12 +529,9 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                                             </button>
                                         </div>
                                         <WeeklyDetailTable records={records} weekOffset={tableWeekOffset} />
-                                    </motion.div>
+                                    </div>
                                 )}
                             </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
             </section>
         </div>
     );
