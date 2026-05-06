@@ -8,7 +8,9 @@ const globalForPostgres = globalThis as unknown as {
   postgresInstance: postgres.Sql | undefined;
 };
 
-export const sql = globalForPostgres.postgresInstance ?? postgres(process.env.POSTGRES_URL!);
+export const sql = globalForPostgres.postgresInstance ?? postgres(process.env.POSTGRES_URL!, {
+  ssl: process.env.NODE_ENV === 'production' ? 'require' : false
+});
 
 if (process.env.NODE_ENV !== 'production') globalForPostgres.postgresInstance = sql;
 
@@ -52,7 +54,7 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
     return rows as unknown as DailyRecord[];
   } catch (error) {
     console.error('Error fetching records:', error);
-    throw new Error('Failed to fetch records');
+    throw new Error(`Failed to fetch records: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -77,7 +79,7 @@ export async function ensureRecord(date: string): Promise<DailyRecord> {
     return rows[0] as unknown as DailyRecord;
   } catch (error) {
     console.error(`Error ensuring record for date: ${date}`, error);
-    throw new Error(`Failed to ensure record for ${date}`);
+    throw new Error(`Failed to ensure record for ${date}: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

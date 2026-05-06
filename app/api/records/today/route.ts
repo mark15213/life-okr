@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getTodayRecord, ensureTodayRecord, getCumulativePushupBalance } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     let [record, cumulativePushupBalance] = await Promise.all([
