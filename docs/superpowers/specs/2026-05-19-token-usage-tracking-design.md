@@ -86,7 +86,7 @@ Standalone TypeScript run via `tsx`. Node built-ins + `dotenv` only; no new deps
 
 1. Compute cutoff = `today (local) − LOOKBACK_DAYS`.
 2. **Claude pass**: walk `~/.claude/projects/`, find `*.jsonl`. Skip files whose `mtime < cutoff`. For surviving files, stream lines; for each line that parses as JSON with `message.usage`, extract the four counts and `timestamp`, and bucket their **sum** into `localDate(timestamp)`.
-3. **Codex pass**: walk `~/.codex/sessions/YYYY/MM/DD/`, descending only into date dirs `>= cutoff − 1` (one extra day to cover UTC↔local skew). For each `rollout-*.jsonl`, stream lines; for each line with `total_tokens`, bucket by `localDate(timestamp)` from the line itself (not the directory).
+3. **Codex pass**: walk `~/.codex/sessions/YYYY/MM/DD/`, descending only into date dirs `>= cutoff − 1` (one extra day to cover UTC↔local skew). For each `rollout-*.jsonl`, stream lines; for each line with `type === "event_msg"` and `payload.type === "token_count"`, bucket `payload.info.last_token_usage.total_tokens` (the per-turn delta) by `localDate(timestamp)` from the line itself. **Do not** use `total_token_usage.total_tokens` — that's the cumulative session total and would massively overcount.
 4. Build payload `{entries: [{date, tool, total_tokens}, ...]}` for every (date, tool) seen in the window. Days with zero usage are not sent.
 5. `POST` to `${DASHBOARD_URL}/api/tokens` in chunks of ≤ 60 entries (one request for normal runs; multiple for backfill) with `Authorization: Bearer ${TOKEN_REPORT_SECRET}`. Any non-2xx response aborts the run.
 6. Print one-line summary on success; exit non-zero on any failure.
@@ -100,7 +100,7 @@ Standalone TypeScript run via `tsx`. Node built-ins + `dotenv` only; no new deps
 - `scanCodex(rootDir, cutoff): Map<date, tokens>` — I/O
 - `main()` — orchestrate + HTTP POST
 
-**Token counting** (per the "all tokens incl. cache reads" decision above): sum all four Claude fields (`input + output + cache_creation + cache_read`). For Codex, prefer `total_tokens` if present, else `input + output`.
+**Token counting** (per the "all tokens incl. cache reads" decision above): for Claude, sum all four `message.usage` fields (`input + output + cache_creation + cache_read`) on each `type === "assistant"` line — these are per-turn deltas, safe to sum. For Codex, sum `payload.info.last_token_usage.total_tokens` (per-turn delta) on each `token_count` event.
 
 **Always full recompute over the window.** No state file, no per-file offsets — the entire scan is sub-second for a personal user, and recompute is naturally idempotent for late writes.
 
