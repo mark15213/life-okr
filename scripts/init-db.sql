@@ -12,3 +12,13 @@ CREATE TABLE IF NOT EXISTS daily_records (
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_records_date ON daily_records(date DESC);
+
+CREATE TABLE IF NOT EXISTS token_usage (
+  date         DATE   NOT NULL,
+  tool         TEXT   NOT NULL,
+  total_tokens BIGINT NOT NULL DEFAULT 0,
+  updated_at   TIMESTAMP DEFAULT NOW(),
+  PRIMARY KEY (date, tool)
+);
+
+CREATE INDEX IF NOT EXISTS idx_token_usage_date ON token_usage(date DESC);
