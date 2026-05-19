@@ -5,9 +5,10 @@ import Link from 'next/link';
 import PushupCard from '@/components/PushupCard';
 import FocusCard from '@/components/FocusCard';
 import TaskCard from '@/components/TaskCard';
+import TokenCard from '@/components/TokenCard';
 import FloatingVault from '@/components/FloatingVault';
 import useSWR from 'swr';
-import { DailyRecord } from '@/lib/db';
+import { DailyRecord, TokenUsageRow } from '@/lib/db';
 import { usePasscode } from '@/lib/usePasscode';
 import { BarChart2, Lock, Unlock } from 'lucide-react';
 
@@ -20,6 +21,8 @@ export default function Home() {
 
   const { data: todayData, mutate: mutateToday } = useSWR('/api/records/today', fetcher);
   const { data: recordsData, mutate: mutateRecords } = useSWR('/api/records?days=30', fetcher);
+  const { data: tokensData } = useSWR('/api/tokens?days=30', fetcher);
+  const tokenEntries: TokenUsageRow[] = tokensData?.entries || [];
 
   const loading = !todayData || !recordsData;
 
@@ -99,6 +102,37 @@ export default function Home() {
     return selectedRecords.reduce((acc, r) => acc + (r[field] as number), 0);
   };
 
+  const tokensByDate = (() => {
+    const m = new Map<string, { claude_code: number; codex: number }>();
+    for (const e of tokenEntries) {
+      const cur = m.get(e.date) ?? { claude_code: 0, codex: 0 };
+      cur[e.tool as 'claude_code' | 'codex'] = e.total_tokens;
+      m.set(e.date, cur);
+    }
+    return m;
+  })();
+
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayKey = `${yyyy}-${mm}-${dd}`;
+  const todayClaude = tokensByDate.get(todayKey)?.claude_code ?? 0;
+  const todayCodex = tokensByDate.get(todayKey)?.codex ?? 0;
+  const todayTokens = todayClaude + todayCodex;
+
+  const sortedDailyTotals: number[] = [...tokensByDate.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([, v]) => v.claude_code + v.codex);
+  const weekTokens = sortedDailyTotals.slice(0, 7);
+  const monthTokens = sortedDailyTotals.slice(0, 30);
+  const tokensWeeklyAverage = weekTokens.length
+    ? Math.round(weekTokens.reduce((a, b) => a + b, 0) / weekTokens.length)
+    : 0;
+  const tokensMonthlyAverage = monthTokens.length
+    ? Math.round(monthTokens.reduce((a, b) => a + b, 0) / monthTokens.length)
+    : 0;
+
   if (loading || !todayRecord) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
@@ -156,7 +190,7 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           <PushupCard
             balance={cumulativeBalance}
             cigarettes={todayRecord.cigarettes}
@@ -178,6 +212,13 @@ export default function Home() {
             monthlyTotal={calculateTotal('tasks_completed', 30)}
             onAddTask={handleAddTask}
             isAuthed={isAuthed}
+          />
+          <TokenCard
+            todayTotal={todayTokens}
+            todayClaude={todayClaude}
+            todayCodex={todayCodex}
+            weeklyAverage={tokensWeeklyAverage}
+            monthlyAverage={tokensMonthlyAverage}
           />
         </div>
 
