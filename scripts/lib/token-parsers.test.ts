@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { localDateOf } from './token-parsers';
+import { localDateOf, parseClaudeLine } from './token-parsers';
 
 test('localDateOf returns YYYY-MM-DD in process timezone', () => {
   // Use a UTC timestamp known to land on different dates depending on TZ.
@@ -29,4 +29,68 @@ test('localDateOf zero-pads single-digit month and day', () => {
 
 test('localDateOf throws on invalid input', () => {
   assert.throws(() => localDateOf('not-a-date'));
+});
+
+const CLAUDE_LINE_VALID = JSON.stringify({
+  timestamp: '2026-05-19T15:30:00Z',
+  type: 'assistant',
+  message: {
+    role: 'assistant',
+    usage: {
+      input_tokens: 6,
+      output_tokens: 113,
+      cache_creation_input_tokens: 13154,
+      cache_read_input_tokens: 16760,
+    },
+  },
+});
+
+test('parseClaudeLine sums all four token fields', () => {
+  const out = parseClaudeLine(CLAUDE_LINE_VALID);
+  assert.ok(out);
+  assert.equal(out!.tokens, 6 + 113 + 13154 + 16760);
+});
+
+test('parseClaudeLine attaches local date from timestamp', () => {
+  const out = parseClaudeLine(CLAUDE_LINE_VALID);
+  assert.ok(out);
+  assert.match(out!.date, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('parseClaudeLine returns null for user messages (no usage)', () => {
+  const line = JSON.stringify({
+    timestamp: '2026-05-19T15:30:00Z',
+    type: 'user',
+    message: { role: 'user', content: 'hi' },
+  });
+  assert.equal(parseClaudeLine(line), null);
+});
+
+test('parseClaudeLine returns null for malformed JSON', () => {
+  assert.equal(parseClaudeLine('not json'), null);
+});
+
+test('parseClaudeLine returns null for empty/whitespace lines', () => {
+  assert.equal(parseClaudeLine(''), null);
+  assert.equal(parseClaudeLine('   \n'), null);
+});
+
+test('parseClaudeLine treats missing token fields as zero', () => {
+  const line = JSON.stringify({
+    timestamp: '2026-05-19T15:30:00Z',
+    type: 'assistant',
+    message: { role: 'assistant', usage: { input_tokens: 5, output_tokens: 10 } },
+  });
+  const out = parseClaudeLine(line);
+  assert.ok(out);
+  assert.equal(out!.tokens, 15);
+});
+
+test('parseClaudeLine returns null when computed total is zero', () => {
+  const line = JSON.stringify({
+    timestamp: '2026-05-19T15:30:00Z',
+    type: 'assistant',
+    message: { role: 'assistant', usage: { input_tokens: 0, output_tokens: 0 } },
+  });
+  assert.equal(parseClaudeLine(line), null);
 });
