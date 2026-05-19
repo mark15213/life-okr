@@ -94,3 +94,50 @@ export async function getCumulativePushupBalance(): Promise<number> {
     return 0;
   }
 }
+
+export interface TokenUsageRow {
+  date: string;
+  tool: 'claude_code' | 'codex';
+  total_tokens: number;
+  updated_at: Date;
+}
+
+export async function getTokenUsage(days: number = 30): Promise<TokenUsageRow[]> {
+  if (!Number.isInteger(days) || days <= 0) {
+    throw new Error('Days parameter must be a positive integer');
+  }
+  try {
+    const rows = await sql`
+      SELECT date, tool, total_tokens, updated_at
+      FROM token_usage
+      WHERE date >= CURRENT_DATE - (${days}::int - 1)
+      ORDER BY date DESC, tool ASC
+    `;
+    return rows.map((r) => ({
+      date: typeof r.date === 'string' ? r.date : (r.date as Date).toISOString().slice(0, 10),
+      tool: r.tool as TokenUsageRow['tool'],
+      total_tokens: Number(r.total_tokens),
+      updated_at: r.updated_at as Date,
+    }));
+  } catch (error) {
+    console.error('Error fetching token usage:', error);
+    throw new Error(`Failed to fetch token usage: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+export async function upsertTokenUsage(
+  entries: Array<{ date: string; tool: 'claude_code' | 'codex'; total_tokens: number }>
+): Promise<number> {
+  if (entries.length === 0) return 0;
+  try {
+    const result = await sql`
+      INSERT INTO token_usage ${sql(entries, 'date', 'tool', 'total_tokens')}
+      ON CONFLICT (date, tool)
+      DO UPDATE SET total_tokens = EXCLUDED.total_tokens, updated_at = NOW()
+    `;
+    return result.count ?? entries.length;
+  } catch (error) {
+    console.error('Error upserting token usage:', error);
+    throw new Error(`Failed to upsert token usage: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
