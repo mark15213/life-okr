@@ -14,16 +14,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     TrendingUp, TrendingDown, Minus, Timer,
     CheckCircle2, Dumbbell, ChevronDown, ChevronUp,
-    Table2, BarChart3, CalendarDays
+    Table2, BarChart3, CalendarDays, Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PeriodicBarChart from './PeriodicBarChart';
 
-type MetricKey = 'focus' | 'tasks' | 'exercises';
+type MetricKey = 'focus' | 'tasks' | 'exercises' | 'tokens';
 type DeepDiveTab = 'chart' | 'table';
 
+type DailyRecordWithTokens = DailyRecord & { total_tokens?: number };
+
 interface DashboardAnalyticsProps {
-    records: DailyRecord[];
+    records: DailyRecordWithTokens[];
 }
 
 const METRICS_CONFIG: Record<MetricKey, {
@@ -66,9 +68,22 @@ const METRICS_CONFIG: Record<MetricKey, {
         chartTitle: 'Exercise Sets',
         formatValue: (v) => `${v}`,
     },
+    tokens: {
+        label: 'AI Tokens',
+        color: '#ec4899',
+        icon: Sparkles,
+        extractValue: (r) => (r as DailyRecordWithTokens).total_tokens ?? 0,
+        metricLabel: 'tokens',
+        chartTitle: 'AI Token Usage',
+        formatValue: (v) => {
+            if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+            if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
+            return String(v);
+        },
+    },
 };
 
-const METRIC_KEYS: MetricKey[] = ['focus', 'tasks', 'exercises'];
+const METRIC_KEYS: MetricKey[] = ['focus', 'tasks', 'exercises', 'tokens'];
 
 function pctChange(current: number, previous: number): { value: number; label: string; direction: 'up' | 'down' | 'neutral' } {
     if (previous === 0 && current === 0) return { value: 0, label: '—', direction: 'neutral' };
@@ -124,7 +139,7 @@ function WeeklyTrendTooltip({ active, payload, label }: any) {
 }
 
 // Daily detail table for selected week
-function WeeklyDetailTable({ records, weekOffset }: { records: DailyRecord[]; weekOffset: number }) {
+function WeeklyDetailTable({ records, weekOffset }: { records: DailyRecordWithTokens[]; weekOffset: number }) {
     const today = new Date();
     const targetWeekStart = startOfWeek(subWeeks(today, weekOffset), { weekStartsOn: 0 });
 
@@ -225,12 +240,11 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                 const rd = parseISO(r.date);
                 return isWithinInterval(rd, { start: weekStart, end: weekEnd });
             });
-            return {
-                focus: recs.reduce((s, r) => s + r.focus_minutes, 0),
-                tasks: recs.reduce((s, r) => s + r.tasks_completed, 0),
-                exercises: recs.reduce((s, r) => s + r.exercises, 0),
-                count: recs.length,
-            };
+            const result: Record<string, number> = { count: recs.length };
+            for (const key of METRIC_KEYS) {
+                result[key] = recs.reduce((s, r) => s + METRICS_CONFIG[key].extractValue(r), 0);
+            }
+            return result;
         };
 
         // This week & last week for KPI cards
@@ -272,9 +286,9 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                 label: `W${weekNum}`,
                 fullLabel: rangeLabel,
                 shortLabel: format(ws, 'M/d'),
-                'Focus Time': agg.focus,
-                'Tasks': agg.tasks,
-                'Exercises': agg.exercises,
+                'Focus Time': agg['focus'],
+                'Tasks': agg['tasks'],
+                'Exercises': agg['exercises'],
                 isCurrent: i === 0,
             });
         }
