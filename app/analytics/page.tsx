@@ -1,20 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import DashboardAnalytics from '@/components/DashboardAnalytics';
 import BackfillModal from '@/components/BackfillModal';
-import { DailyRecord } from '@/lib/db';
+import { DailyRecord, TokenUsageRow } from '@/lib/db';
 import { ArrowLeft } from 'lucide-react';
-
 import useSWR from 'swr';
+
+type DailyRecordWithTokens = DailyRecord & { total_tokens: number };
 
 export default function AnalyticsPage() {
     const fetcher = (url: string) => fetch(url).then(res => res.json());
-    const { data, mutate } = useSWR('/api/records?days=365', fetcher);
+    const { data: recordsData, mutate } = useSWR('/api/records?days=365', fetcher);
+    const { data: tokensData } = useSWR('/api/tokens?days=365', fetcher);
 
-    const records = data?.records || [];
-    const loading = !data;
+    const baseRecords: DailyRecord[] = recordsData?.records || [];
+    const tokenEntries: TokenUsageRow[] = tokensData?.entries || [];
+    const loading = !recordsData || !tokensData;
+
+    const tokensByDate = new Map<string, number>();
+    for (const e of tokenEntries) {
+      tokensByDate.set(e.date, (tokensByDate.get(e.date) ?? 0) + e.total_tokens);
+    }
+    const records: DailyRecordWithTokens[] = baseRecords.map((r) => ({
+      ...r,
+      total_tokens: tokensByDate.get(r.date) ?? 0,
+    }));
 
     const fetchData = () => {
         mutate();
