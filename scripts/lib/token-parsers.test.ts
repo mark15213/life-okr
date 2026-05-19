@@ -13,12 +13,20 @@ test('localDateOf returns YYYY-MM-DD in process timezone', () => {
   assert.equal(out, expected);
 });
 
-test('localDateOf zero-pads month and day', () => {
-  const out = localDateOf('2026-01-02T12:00:00Z');
-  assert.match(out, /^\d{4}-\d{2}-\d{2}$/);
+test('localDateOf zero-pads single-digit month and day', () => {
+  // Pick a UTC instant whose local-date components are single-digit in some TZs.
+  // We rebuild the expected string the same way the implementation does, so the
+  // test stays portable, but we explicitly assert the digit count of the components.
+  const iso = '2026-03-05T12:00:00Z';
+  const out = localDateOf(iso);
+  const d = new Date(iso);
+  const expected = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  assert.equal(out, expected);
+  const [, mm, dd] = out.split('-');
+  assert.equal(mm.length, 2);
+  assert.equal(dd.length, 2);
 });
 
-test('localDateOf returns null-equivalent on invalid input', () => {
-  // We choose to throw on bad input rather than return null — caller must filter timestamps first.
+test('localDateOf throws on invalid input', () => {
   assert.throws(() => localDateOf('not-a-date'));
 });
