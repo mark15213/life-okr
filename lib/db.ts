@@ -23,6 +23,9 @@ export interface DailyRecord {
   focus_minutes: number;
   tasks_completed: number;
   calories_burned: number;
+  focus_minutes_ticktick: number;
+  tasks_completed_ticktick: number;
+  ticktick_synced_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }

@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS daily_records (
   focus_minutes INT NOT NULL DEFAULT 0,
   tasks_completed INT NOT NULL DEFAULT 0,
   calories_burned INT NOT NULL DEFAULT 0,
+  focus_minutes_ticktick INT NOT NULL DEFAULT 0,
+  tasks_completed_ticktick INT NOT NULL DEFAULT 0,
+  ticktick_synced_at TIMESTAMP,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
