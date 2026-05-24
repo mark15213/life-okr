@@ -144,3 +144,23 @@ export async function upsertTokenUsage(
     throw new Error(`Failed to upsert token usage: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
+
+export async function upsertTicktickSync(
+  date: string,
+  focusMinutes: number,
+  tasksCompleted: number
+): Promise<void> {
+  try {
+    await sql`
+      INSERT INTO daily_records (date, focus_minutes_ticktick, tasks_completed_ticktick, ticktick_synced_at)
+      VALUES (${date}, ${focusMinutes}, ${tasksCompleted}, NOW())
+      ON CONFLICT (date) DO UPDATE SET
+        focus_minutes_ticktick = EXCLUDED.focus_minutes_ticktick,
+        tasks_completed_ticktick = EXCLUDED.tasks_completed_ticktick,
+        ticktick_synced_at = NOW()
+    `;
+  } catch (error) {
+    console.error(`Error upserting ticktick sync for ${date}:`, error);
+    throw new Error(`Failed to upsert ticktick sync: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
