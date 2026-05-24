@@ -22,6 +22,14 @@ export function countCompletedTasksToday(tasks: TickTickTask[], range: LocalDayR
   return count;
 }
 
-export function sumFocusMinutesToday(_pomodoros: TickTickPomodoro[], _range: LocalDayRange): number {
-  throw new Error('not implemented');
+export function sumFocusMinutesToday(pomodoros: TickTickPomodoro[], range: LocalDayRange): number {
+  let totalSeconds = 0;
+  for (const p of pomodoros) {
+    const ms = new Date(p.startTime).getTime();
+    if (Number.isNaN(ms)) continue;
+    if (ms >= range.startMs && ms < range.endMs) {
+      totalSeconds += p.duration;
+    }
+  }
+  return Math.round(totalSeconds / 60);
 }
