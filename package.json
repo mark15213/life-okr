@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "setup-db": "tsx scripts/setup-db.ts",
-    "report-tokens": "tsx scripts/report-tokens.ts"
+    "report-tokens": "tsx scripts/report-tokens.ts",
+    "sync-ticktick": "tsx scripts/sync-ticktick.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
