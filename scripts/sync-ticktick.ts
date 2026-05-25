@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
-import { OfficialClient, UnofficialClient } from './lib/ticktick-client';
+import { UnofficialClient } from './lib/ticktick-client';
 
 // dotenv must run before lib/db is imported — lib/db initializes the postgres
 // client at module load using process.env.POSTGRES_URL.
@@ -18,14 +18,9 @@ function requireEnv(key: string): string {
 async function main() {
   const { upsertTicktickSync } = await import('../lib/db');
 
-  const official = new OfficialClient({
-    clientId: requireEnv('TICKTICK_CLIENT_ID'),
-    clientSecret: requireEnv('TICKTICK_CLIENT_SECRET'),
-    accessToken: requireEnv('TICKTICK_ACCESS_TOKEN'),
-    // TickTick's open OAuth does not return a refresh_token. Access tokens last
-    // ~180 days; when they expire, re-run scripts/ticktick-oauth-bootstrap.ts.
-    refreshToken: process.env.TICKTICK_REFRESH_TOKEN ?? '',
-  });
+  // Both task count and focus minutes go through the unofficial cookie API — the
+  // official /open/v1 endpoint excludes Inbox tasks, so it was unusable for users
+  // who keep most tasks in Inbox. See memory/ticktick-api-quirks.md.
   const unofficial = new UnofficialClient({
     email: requireEnv('TICKTICK_EMAIL'),
     password: requireEnv('TICKTICK_PASSWORD'),
@@ -33,7 +28,7 @@ async function main() {
   });
 
   const [tasksCompleted, focusMinutes] = await Promise.all([
-    official.getCompletedTaskCountToday(),
+    unofficial.getCompletedTaskCountToday(),
     unofficial.getFocusMinutesToday(),
   ]);
 
