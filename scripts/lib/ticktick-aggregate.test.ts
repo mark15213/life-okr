@@ -31,20 +31,38 @@ test('handles malformed completedTime by skipping', () => {
   assert.equal(countCompletedTasksToday(tasks, range), 1);
 });
 
-test('sums pomodoro durations that started today, returns rounded minutes', () => {
+test('sums pomodoro durations (end-start-pause) for sessions started today', () => {
   const pomodoros = [
-    { startTime: new Date(2026, 4, 24, 9, 0, 0).toISOString(), duration: 1500 },   // 25 min today
-    { startTime: new Date(2026, 4, 24, 14, 30, 0).toISOString(), duration: 1800 }, // 30 min today
-    { startTime: new Date(2026, 4, 23, 22, 0, 0).toISOString(), duration: 1500 },  // yesterday — skip
-    { startTime: 'not-a-date', duration: 600 },                                     // malformed — skip
+    // 25 min today
+    {
+      startTime: new Date(2026, 4, 24, 9, 0, 0).toISOString(),
+      endTime: new Date(2026, 4, 24, 9, 25, 0).toISOString(),
+    },
+    // 30 min today, with 60s pause → 29 min effective
+    {
+      startTime: new Date(2026, 4, 24, 14, 30, 0).toISOString(),
+      endTime: new Date(2026, 4, 24, 15, 0, 0).toISOString(),
+      pauseDuration: 60,
+    },
+    // yesterday — skip
+    {
+      startTime: new Date(2026, 4, 23, 22, 0, 0).toISOString(),
+      endTime: new Date(2026, 4, 23, 22, 25, 0).toISOString(),
+    },
+    // malformed — skip
+    { startTime: 'not-a-date', endTime: 'also-not-a-date' },
   ];
-  // 1500 + 1800 = 3300s = 55 min
-  assert.equal(sumFocusMinutesToday(pomodoros, range), 55);
+  // 25 + 29 = 54 min
+  assert.equal(sumFocusMinutesToday(pomodoros, range), 54);
 });
 
 test('sumFocusMinutesToday rounds to nearest integer minute', () => {
   const pomodoros = [
-    { startTime: new Date(2026, 4, 24, 9, 0, 0).toISOString(), duration: 90 }, // 1.5 min → 2
+    // 90 seconds → 1.5 min → 2
+    {
+      startTime: new Date(2026, 4, 24, 9, 0, 0).toISOString(),
+      endTime: new Date(2026, 4, 24, 9, 1, 30).toISOString(),
+    },
   ];
   assert.equal(sumFocusMinutesToday(pomodoros, range), 2);
 });

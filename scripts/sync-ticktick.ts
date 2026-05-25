@@ -1,8 +1,9 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { OfficialClient, UnofficialClient } from './lib/ticktick-client';
-import { upsertTicktickSync } from '../lib/db';
 
+// dotenv must run before lib/db is imported — lib/db initializes the postgres
+// client at module load using process.env.POSTGRES_URL.
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 function requireEnv(key: string): string {
@@ -15,6 +16,8 @@ function requireEnv(key: string): string {
 }
 
 async function main() {
+  const { upsertTicktickSync } = await import('../lib/db');
+
   const official = new OfficialClient({
     clientId: requireEnv('TICKTICK_CLIENT_ID'),
     clientSecret: requireEnv('TICKTICK_CLIENT_SECRET'),
@@ -43,5 +46,8 @@ main()
   .then(() => process.exit(0))
   .catch((e) => {
     console.error('❌ ticktick sync failed:', e instanceof Error ? e.message : e);
+    if (e instanceof Error && e.cause) {
+      console.error('   cause:', e.cause);
+    }
     process.exit(1);
   });

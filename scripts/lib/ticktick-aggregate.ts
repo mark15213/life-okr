@@ -7,7 +7,8 @@ export interface TickTickTask {
 
 export interface TickTickPomodoro {
   startTime: string;
-  duration: number; // seconds
+  endTime: string;
+  pauseDuration?: number; // seconds paused mid-session
 }
 
 export function countCompletedTasksToday(tasks: TickTickTask[], range: LocalDayRange): number {
@@ -25,11 +26,12 @@ export function countCompletedTasksToday(tasks: TickTickTask[], range: LocalDayR
 export function sumFocusMinutesToday(pomodoros: TickTickPomodoro[], range: LocalDayRange): number {
   let totalSeconds = 0;
   for (const p of pomodoros) {
-    const ms = new Date(p.startTime).getTime();
-    if (Number.isNaN(ms)) continue;
-    if (ms >= range.startMs && ms < range.endMs) {
-      totalSeconds += p.duration;
-    }
+    const startMs = new Date(p.startTime).getTime();
+    const endMs = new Date(p.endTime).getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(endMs)) continue;
+    if (startMs < range.startMs || startMs >= range.endMs) continue;
+    const elapsedSec = Math.max(0, Math.round((endMs - startMs) / 1000) - (p.pauseDuration ?? 0));
+    totalSeconds += elapsedSec;
   }
   return Math.round(totalSeconds / 60);
 }
