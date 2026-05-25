@@ -60,6 +60,12 @@ export class OfficialClient {
   }
 
   private async refresh(): Promise<void> {
+    if (!this.refreshToken) {
+      throw new Error(
+        'TickTick access_token expired and no refresh_token is available. ' +
+        'Re-run scripts/ticktick-oauth-bootstrap.ts and replace TICKTICK_ACCESS_TOKEN in .env.local.'
+      );
+    }
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: this.refreshToken,

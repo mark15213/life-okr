@@ -19,7 +19,9 @@ async function main() {
     clientId: requireEnv('TICKTICK_CLIENT_ID'),
     clientSecret: requireEnv('TICKTICK_CLIENT_SECRET'),
     accessToken: requireEnv('TICKTICK_ACCESS_TOKEN'),
-    refreshToken: requireEnv('TICKTICK_REFRESH_TOKEN'),
+    // TickTick's open OAuth does not return a refresh_token. Access tokens last
+    // ~180 days; when they expire, re-run scripts/ticktick-oauth-bootstrap.ts.
+    refreshToken: process.env.TICKTICK_REFRESH_TOKEN ?? '',
   });
   const unofficial = new UnofficialClient({
     email: requireEnv('TICKTICK_EMAIL'),
