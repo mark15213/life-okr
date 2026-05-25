@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import PushupCard from '@/components/PushupCard';
 import FocusCard from '@/components/FocusCard';
@@ -29,6 +29,22 @@ export default function Home() {
   const todayRecord: DailyRecord | null = todayData?.record || null;
   const cumulativeBalance: number = todayData?.cumulativePushupBalance ?? todayData?.record?.pushup_balance ?? 0;
   const records: DailyRecord[] = recordsData?.records || [];
+
+  // Display-side aggregation: manual + ticktick columns are summed for UI.
+  // The raw columns remain available on todayRecord for optimistic-update math.
+  const displayFocusMinutesToday = todayRecord
+    ? todayRecord.focus_minutes + (todayRecord.focus_minutes_ticktick ?? 0)
+    : 0;
+  const displayTasksCompletedToday = todayRecord
+    ? todayRecord.tasks_completed + (todayRecord.tasks_completed_ticktick ?? 0)
+    : 0;
+
+  const displayRecord = (r: DailyRecord) => ({
+    ...r,
+    focus_minutes: r.focus_minutes + (r.focus_minutes_ticktick ?? 0),
+    tasks_completed: r.tasks_completed + (r.tasks_completed_ticktick ?? 0),
+  });
+  const displayRecords: DailyRecord[] = records.map(displayRecord);
 
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,21 +100,21 @@ export default function Home() {
   };
 
   const calculateWeeklyAverage = (field: keyof DailyRecord) => {
-    const weekRecords = records.slice(0, 7);
+    const weekRecords = displayRecords.slice(0, 7);
     if (weekRecords.length === 0) return 0;
     const sum = weekRecords.reduce((acc, r) => acc + (r[field] as number), 0);
     return Math.round(sum / weekRecords.length);
   };
 
   const calculateMonthlyAverage = (field: keyof DailyRecord) => {
-    const monthRecords = records.slice(0, 30);
+    const monthRecords = displayRecords.slice(0, 30);
     if (monthRecords.length === 0) return 0;
     const sum = monthRecords.reduce((acc, r) => acc + (r[field] as number), 0);
     return Math.round(sum / monthRecords.length);
   };
 
   const calculateTotal = (field: keyof DailyRecord, days: number) => {
-    const selectedRecords = records.slice(0, days);
+    const selectedRecords = displayRecords.slice(0, days);
     return selectedRecords.reduce((acc, r) => acc + (r[field] as number), 0);
   };
 
@@ -144,20 +160,18 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 relative overflow-hidden font-sans text-zinc-900 selection:bg-zinc-200">
+    <main className="min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_48%,#f6f3ee_100%)] relative overflow-hidden font-sans text-zinc-900 selection:bg-zinc-200">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] mix-blend-multiply pointer-events-none" />
-      <div className="absolute top-[-20%] left-[-10%] w-[70vw] h-[70vw] rounded-full bg-gradient-to-br from-blue-100/40 to-transparent blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full bg-gradient-to-tl from-stone-200/50 to-transparent blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto relative z-10 px-4 sm:px-8 py-12 md:py-20">
+      <div className="max-w-[1700px] mx-auto relative z-10 px-5 sm:px-8 lg:px-12 py-10 md:py-16">
         {/* Header */}
-        <header className="mb-16 flex items-end justify-between border-b border-zinc-200 pb-6">
+        <header className="mb-14 flex flex-col gap-6 border-b border-zinc-200/80 pb-7 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-5xl md:text-6xl tracking-tighter text-zinc-900 drop-shadow-sm font-bold" style={{ fontFamily: 'var(--font-newspaper)', letterSpacing: '-0.02em' }}>
               Hustle.
             </h1>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             {/* Auth Status & Passcode Input */}
             {!isAuthed ? (
               <form onSubmit={handlePasscodeSubmit} className="flex items-center gap-2">
@@ -190,7 +204,7 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-7 lg:gap-10 2xl:gap-12 mb-12">
           <PushupCard
             balance={cumulativeBalance}
             cigarettes={todayRecord.cigarettes}
@@ -200,14 +214,14 @@ export default function Home() {
             isAuthed={isAuthed}
           />
           <FocusCard
-            todayMinutes={todayRecord.focus_minutes}
+            todayMinutes={displayFocusMinutesToday}
             weeklyAverage={calculateWeeklyAverage('focus_minutes')}
             monthlyAverage={calculateMonthlyAverage('focus_minutes')}
             onAddFocus={handleAddFocus}
             isAuthed={isAuthed}
           />
           <TaskCard
-            todayTasks={todayRecord.tasks_completed}
+            todayTasks={displayTasksCompletedToday}
             weeklyTotal={calculateTotal('tasks_completed', 7)}
             monthlyTotal={calculateTotal('tasks_completed', 30)}
             onAddTask={handleAddTask}
