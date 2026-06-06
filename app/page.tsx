@@ -8,7 +8,8 @@ import TaskCard from '@/components/TaskCard';
 import TokenCard from '@/components/TokenCard';
 import FloatingVault from '@/components/FloatingVault';
 import useSWR from 'swr';
-import { DailyRecord, TokenUsageRow, withTicktickSummed } from '@/lib/db';
+import type { DailyRecord, TokenUsageRow } from '@/lib/db';
+import { withTicktickSummed } from '@/lib/utils';
 import { usePasscode } from '@/lib/usePasscode';
 import { BarChart2, Lock, Unlock } from 'lucide-react';
 

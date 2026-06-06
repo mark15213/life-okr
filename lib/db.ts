@@ -86,14 +86,6 @@ export async function ensureRecord(date: string): Promise<DailyRecord> {
   }
 }
 
-export function withTicktickSummed<T extends DailyRecord>(r: T): T {
-  return {
-    ...r,
-    focus_minutes: r.focus_minutes + (r.focus_minutes_ticktick ?? 0),
-    tasks_completed: r.tasks_completed + (r.tasks_completed_ticktick ?? 0),
-  };
-}
-
 export async function getCumulativePushupBalance(): Promise<number> {
   try {
     const rows = await sql`

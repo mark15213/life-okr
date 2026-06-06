@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import DashboardAnalytics from '@/components/DashboardAnalytics';
 import BackfillModal from '@/components/BackfillModal';
-import { DailyRecord, TokenUsageRow, withTicktickSummed } from '@/lib/db';
+import type { DailyRecord, TokenUsageRow } from '@/lib/db';
+import { withTicktickSummed } from '@/lib/utils';
 import { ArrowLeft } from 'lucide-react';
 import useSWR from 'swr';
 
