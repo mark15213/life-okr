@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { UnofficialClient } from './lib/ticktick-client';
+import { getLocalDateString } from './lib/ticktick-date';
 
 // dotenv must run before lib/db is imported — lib/db initializes the postgres
 // client at module load using process.env.POSTGRES_URL.
@@ -32,7 +33,12 @@ async function main() {
     unofficial.getFocusMinutesToday(),
   ]);
 
-  const today = new Date().toISOString().split('T')[0];
+  // Must match the local-day window used by getCompletedTaskCountToday /
+  // getFocusMinutesToday. Using UTC date here (via toISOString) is a bug for
+  // users west/east of UTC: between local midnight and UTC midnight the script
+  // would query today's local data but stamp it onto yesterday's UTC-named row,
+  // wiping yesterday with zeros.
+  const today = getLocalDateString(new Date());
   await upsertTicktickSync(today, focusMinutes, tasksCompleted);
   console.log(`✅ ticktick sync ${today}: focus=${focusMinutes}m, tasks=${tasksCompleted}`);
 }
