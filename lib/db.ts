@@ -30,13 +30,23 @@ export interface DailyRecord {
   updated_at: Date;
 }
 
+// postgres-js returns DATE columns as JS Date objects. Our DailyRecord.date
+// is typed as `string` ("YYYY-MM-DD") and several callers (analytics token
+// join, FloatingVault equality check) depend on the YYYY-MM-DD shape.
+// Normalize at the boundary so the runtime shape matches the type.
+function normalizeRecord(row: Record<string, unknown>): DailyRecord {
+  const raw = row.date;
+  const date = typeof raw === 'string' ? raw.slice(0, 10) : (raw as Date).toISOString().slice(0, 10);
+  return { ...(row as unknown as DailyRecord), date };
+}
+
 export async function getTodayRecord(): Promise<DailyRecord | null> {
   try {
     const today = new Date().toISOString().split('T')[0];
     const rows = await sql`
       SELECT * FROM daily_records WHERE date = ${today}
     `;
-    return (rows[0] as unknown as DailyRecord) || null;
+    return rows[0] ? normalizeRecord(rows[0] as Record<string, unknown>) : null;
   } catch (error) {
     console.error('Error fetching today\'s record:', error);
     throw new Error('Failed to fetch today\'s record');
@@ -54,7 +64,7 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
       ORDER BY date DESC
       LIMIT ${days}
     `;
-    return rows as unknown as DailyRecord[];
+    return rows.map((r) => normalizeRecord(r as Record<string, unknown>));
   } catch (error) {
     console.error('Error fetching records:', error);
     throw new Error(`Failed to fetch records: ${error instanceof Error ? error.message : String(error)}`);
@@ -79,7 +89,7 @@ export async function ensureRecord(date: string): Promise<DailyRecord> {
       throw new Error(`Failed to create or retrieve record for date: ${date}`);
     }
 
-    return rows[0] as unknown as DailyRecord;
+    return normalizeRecord(rows[0] as Record<string, unknown>);
   } catch (error) {
     console.error(`Error ensuring record for date: ${date}`, error);
     throw new Error(`Failed to ensure record for ${date}: ${error instanceof Error ? error.message : String(error)}`);
