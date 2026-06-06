@@ -40,9 +40,19 @@ function normalizeRecord(row: Record<string, unknown>): DailyRecord {
   return { ...(row as unknown as DailyRecord), date };
 }
 
+// "Today" is whatever calendar date it is for the user, not for the server.
+// Vercel runs in UTC, so using `new Date().toISOString()` would put writes/reads
+// onto yesterday's row whenever the user is east of UTC during their early
+// morning. Pin to APP_TZ (default Asia/Shanghai); en-CA locale renders as
+// YYYY-MM-DD, matching the daily_records.date column shape.
+const APP_TZ = process.env.APP_TZ ?? 'Asia/Shanghai';
+function todayInAppTz(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: APP_TZ });
+}
+
 export async function getTodayRecord(): Promise<DailyRecord | null> {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayInAppTz();
     const rows = await sql`
       SELECT * FROM daily_records WHERE date = ${today}
     `;
@@ -72,8 +82,7 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
 }
 
 export async function ensureTodayRecord(): Promise<DailyRecord> {
-  const today = new Date().toISOString().split('T')[0];
-  return ensureRecord(today);
+  return ensureRecord(todayInAppTz());
 }
 
 export async function ensureRecord(date: string): Promise<DailyRecord> {
