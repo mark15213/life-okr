@@ -8,7 +8,7 @@ import TaskCard from '@/components/TaskCard';
 import TokenCard from '@/components/TokenCard';
 import FloatingVault from '@/components/FloatingVault';
 import useSWR from 'swr';
-import { DailyRecord, TokenUsageRow } from '@/lib/db';
+import { DailyRecord, TokenUsageRow, withTicktickSummed } from '@/lib/db';
 import { usePasscode } from '@/lib/usePasscode';
 import { BarChart2, Lock, Unlock } from 'lucide-react';
 
@@ -39,12 +39,7 @@ export default function Home() {
     ? todayRecord.tasks_completed + (todayRecord.tasks_completed_ticktick ?? 0)
     : 0;
 
-  const displayRecord = (r: DailyRecord) => ({
-    ...r,
-    focus_minutes: r.focus_minutes + (r.focus_minutes_ticktick ?? 0),
-    tasks_completed: r.tasks_completed + (r.tasks_completed_ticktick ?? 0),
-  });
-  const displayRecords: DailyRecord[] = records.map(displayRecord);
+  const displayRecords: DailyRecord[] = records.map(withTicktickSummed);
 
   const handlePasscodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();

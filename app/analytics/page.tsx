@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import DashboardAnalytics from '@/components/DashboardAnalytics';
 import BackfillModal from '@/components/BackfillModal';
-import { DailyRecord, TokenUsageRow } from '@/lib/db';
+import { DailyRecord, TokenUsageRow, withTicktickSummed } from '@/lib/db';
 import { ArrowLeft } from 'lucide-react';
 import useSWR from 'swr';
 
@@ -23,7 +23,7 @@ export default function AnalyticsPage() {
       tokensByDate.set(e.date, (tokensByDate.get(e.date) ?? 0) + e.total_tokens);
     }
     const records: DailyRecordWithTokens[] = baseRecords.map((r) => ({
-      ...r,
+      ...withTicktickSummed(r),
       total_tokens: tokensByDate.get(r.date) ?? 0,
     }));
 
