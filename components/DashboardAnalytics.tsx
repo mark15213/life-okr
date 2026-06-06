@@ -113,6 +113,13 @@ function ChangeIndicator({ change }: { change: ReturnType<typeof pctChange> }) {
     );
 }
 
+const TREND_LINE_TO_METRIC: Record<string, MetricKey> = {
+    'Focus Time': 'focus',
+    'Tasks': 'tasks',
+    'Exercises': 'exercises',
+    'AI Tokens': 'tokens',
+};
+
 // Custom tooltip for the weekly trends chart
 function WeeklyTrendTooltip({ active, payload, label }: any) {
     if (!active || !payload || payload.length === 0) return null;
@@ -124,15 +131,21 @@ function WeeklyTrendTooltip({ active, payload, label }: any) {
                 {dataPoint?.fullLabel || label}
             </p>
             <div className="space-y-2">
-                {payload.map((entry: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between gap-6">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-                            <span className="text-sm text-zinc-600">{entry.name}</span>
+                {payload.map((entry: any, i: number) => {
+                    const metricKey = TREND_LINE_TO_METRIC[entry.name as string];
+                    const display = metricKey
+                        ? METRICS_CONFIG[metricKey].formatValue(entry.value)
+                        : entry.value;
+                    return (
+                        <div key={i} className="flex items-center justify-between gap-6">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
+                                <span className="text-sm text-zinc-600">{entry.name}</span>
+                            </div>
+                            <span className="text-sm font-semibold text-zinc-900">{display}</span>
                         </div>
-                        <span className="text-sm font-semibold text-zinc-900">{entry.value}</span>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );
@@ -289,6 +302,7 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                 'Focus Time': agg['focus'],
                 'Tasks': agg['tasks'],
                 'Exercises': agg['exercises'],
+                'AI Tokens': agg['tokens'],
                 isCurrent: i === 0,
             });
         }
@@ -393,6 +407,10 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                                     tick={{ fill: '#a1a1aa', fontSize: 11 }}
                                     dx={5}
                                 />
+                                {/* Hidden tokens axis — keeps the AI Tokens line scaled to its own
+                                    millions-range so it doesn't squash the focus/tasks/exercises lines.
+                                    The tooltip still reports the raw token count. */}
+                                <YAxis yAxisId="tokens" hide domain={[0, 'auto']} />
                                 <Tooltip content={<WeeklyTrendTooltip />} />
                                 <Legend
                                     iconType="circle"
@@ -426,6 +444,16 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                                     stroke={METRICS_CONFIG.exercises.color}
                                     strokeWidth={2.5}
                                     dot={{ r: 3, fill: METRICS_CONFIG.exercises.color, strokeWidth: 0 }}
+                                    activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff' }}
+                                    animationDuration={1200}
+                                />
+                                <Line
+                                    yAxisId="tokens"
+                                    type="monotone"
+                                    dataKey="AI Tokens"
+                                    stroke={METRICS_CONFIG.tokens.color}
+                                    strokeWidth={2.5}
+                                    dot={{ r: 3, fill: METRICS_CONFIG.tokens.color, strokeWidth: 0 }}
                                     activeDot={{ r: 5, strokeWidth: 2, stroke: '#fff' }}
                                     animationDuration={1200}
                                 />
