@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Timer, Plus } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 interface FocusCardProps {
   todayMinutes: number;
@@ -46,32 +45,32 @@ export default function FocusCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1 }}
       whileHover={{ y: -5, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.05)" }}
-      className="relative rounded-3xl p-8 bg-white/80 backdrop-blur-xl border border-zinc-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all duration-500 overflow-hidden flex flex-col justify-between"
+      className="relative min-h-[520px] rounded-[2rem] p-7 sm:p-8 xl:p-9 bg-white/90 backdrop-blur-xl border border-zinc-200/70 shadow-[0_18px_55px_rgba(15,23,42,0.07)] transition-all duration-500 overflow-hidden flex flex-col justify-between"
     >
       {/* Top Header Area */}
-      <div className="flex justify-between items-start mb-8">
-        <h2 className="text-zinc-500 text-sm font-semibold uppercase tracking-widest flex items-center gap-2">
+      <div className="flex justify-between items-start mb-10">
+        <h2 className="text-zinc-500 text-sm font-semibold uppercase tracking-widest flex items-center gap-2 leading-none">
           <Timer className="w-4 h-4 text-zinc-400" />
           Focus Time
         </h2>
       </div>
 
       {/* Main Focus Time Display */}
-      <div className="text-center mb-8 flex-1 flex flex-col justify-center">
+      <div className="text-center mb-10 flex-1 flex flex-col justify-center">
         <motion.div
           key={todayMinutes}
           initial={{ scale: 1.1, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="text-7xl font-light text-zinc-900 tracking-tight"
+          className="text-6xl sm:text-7xl font-light text-zinc-900 tracking-tight tabular-nums"
         >
           {formatTime(todayMinutes)}
         </motion.div>
 
-        <div className="mt-2 text-sm text-zinc-400 font-medium">Today's Focus</div>
+        <div className="mt-2 text-sm text-zinc-400 font-medium">Today&apos;s Focus</div>
       </div>
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="mb-6">
+      <form onSubmit={handleSubmit} className="mb-8">
         <div className="flex gap-2 relative">
           <input
             type="number"
@@ -79,7 +78,7 @@ export default function FocusCard({
             onChange={(e) => setMinutes(e.target.value)}
             placeholder="Add minutes..."
             min="1"
-            className="flex-1 bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder-zinc-400 px-4 py-3 rounded-2xl font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-w-0 flex-1 bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder-zinc-400 px-4 py-3 rounded-2xl font-medium focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={loading || !isAuthed}
           />
           <motion.button
@@ -87,7 +86,7 @@ export default function FocusCard({
             whileTap={isAuthed && minutes ? { scale: 0.98 } : {}}
             type="submit"
             disabled={loading || !minutes || !isAuthed}
-            className="bg-zinc-900 hover:bg-zinc-800 text-white px-5 py-3 rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            className="h-[50px] w-[56px] shrink-0 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             <Plus className="w-5 h-5" />
           </motion.button>
