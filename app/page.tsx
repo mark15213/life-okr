@@ -21,7 +21,7 @@ export default function Home() {
   const fetcher = (url: string) => fetch(url).then(res => res.json());
 
   const { data: todayData, mutate: mutateToday } = useSWR('/api/records/today', fetcher);
-  const { data: recordsData, mutate: mutateRecords } = useSWR('/api/records?days=30', fetcher);
+  const { data: recordsData, mutate: mutateRecords } = useSWR('/api/records?days=365', fetcher);
   const { data: tokensData } = useSWR('/api/tokens?days=30', fetcher);
   const tokenEntries: TokenUsageRow[] = tokensData?.entries || [];
 
@@ -236,7 +236,7 @@ export default function Home() {
         </div>
 
         {/* Floating Reward Vault Widget */}
-        <FloatingVault records={records} todayRecord={todayRecord} cumulativeBalance={cumulativeBalance} isAuthed={isAuthed} />
+        <FloatingVault records={displayRecords} todayRecord={withTicktickSummed(todayRecord)} cumulativeBalance={cumulativeBalance} isAuthed={isAuthed} />
       </div>
     </main>
   );
