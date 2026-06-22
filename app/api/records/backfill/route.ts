@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { ensureRecord, sql } from '@/lib/db';
+import { hasValidAuthSession } from '@/lib/auth';
 
 export async function POST(req: Request) {
+    if (!hasValidAuthSession(req)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const body = await req.json().catch(() => ({}));
 

@@ -42,9 +42,10 @@ export default function Home() {
 
   const displayRecords: DailyRecord[] = records.map(withTicktickSummed);
 
-  const handlePasscodeSubmit = (e: React.FormEvent) => {
+  const handlePasscodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!verify(passcodeInput)) {
+    const ok = await verify(passcodeInput);
+    if (!ok) {
       setPasscodeError(true);
       setTimeout(() => setPasscodeError(false), 1500);
     }
@@ -55,7 +56,7 @@ export default function Home() {
     if (!todayRecord) return;
     const optimisticRecord = { ...todayRecord, cigarettes: todayRecord.cigarettes + 1 };
     mutateToday({ ...todayData, record: optimisticRecord }, false);
-    await fetch('/api/records/cigarette', { method: 'POST' });
+    await fetch('/api/records/cigarette', { method: 'POST', credentials: 'same-origin' });
     mutateToday();
     mutateRecords();
   };
@@ -67,6 +68,7 @@ export default function Home() {
     await fetch('/api/records/exercise', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ calories }),
     });
     mutateToday();
@@ -80,6 +82,7 @@ export default function Home() {
     await fetch('/api/records/focus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ minutes }),
     });
     mutateToday();
@@ -90,7 +93,7 @@ export default function Home() {
     if (!todayRecord) return;
     const optimisticRecord = { ...todayRecord, tasks_completed: todayRecord.tasks_completed + 1 };
     mutateToday({ ...todayData, record: optimisticRecord }, false);
-    await fetch('/api/records/task', { method: 'POST' });
+    await fetch('/api/records/task', { method: 'POST', credentials: 'same-origin' });
     mutateToday();
     mutateRecords();
   };

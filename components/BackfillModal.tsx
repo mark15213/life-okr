@@ -2,14 +2,18 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Calendar, Dumbbell, Flame, Timer, CheckCircle2 } from 'lucide-react';
+import { Plus, X, Calendar, Dumbbell, Flame, Timer, CheckCircle2, Lock } from 'lucide-react';
 import { format, subDays } from 'date-fns';
+import { usePasscode } from '@/lib/usePasscode';
 
 interface BackfillModalProps {
     onSuccess: () => void;
+    isAuthed?: boolean;
 }
 
-export default function BackfillModal({ onSuccess }: BackfillModalProps) {
+export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProps) {
+    const passcode = usePasscode();
+    const canWrite = isAuthed ?? passcode.isAuthed;
     const [isOpen, setIsOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -26,6 +30,11 @@ export default function BackfillModal({ onSuccess }: BackfillModalProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+
+        if (!canWrite) {
+            setError('Unlock first to modify data.');
+            return;
+        }
 
         const numExercises = exercises ? parseInt(exercises, 10) : 0;
         const numCalories = calories ? parseInt(calories, 10) : 0;
@@ -48,6 +57,7 @@ export default function BackfillModal({ onSuccess }: BackfillModalProps) {
             const res = await fetch('/api/records/backfill', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     date,
                     exercises: numExercises,
@@ -58,8 +68,12 @@ export default function BackfillModal({ onSuccess }: BackfillModalProps) {
             });
 
             if (!res.ok) {
-                const data = await res.json();
-                throw new Error(data.error || 'Failed to backfill data');
+                const data = await res.json().catch(() => ({}));
+                throw new Error(
+                    res.status === 401
+                        ? 'Unlock first to modify data.'
+                        : data.error || 'Failed to backfill data'
+                );
             }
 
             // Reset form
@@ -69,8 +83,8 @@ export default function BackfillModal({ onSuccess }: BackfillModalProps) {
             setTasks('');
             setIsOpen(false);
             onSuccess();
-        } catch (err: any) {
-            setError(err.message || 'Something went wrong');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Something went wrong');
         } finally {
             setLoading(false);
         }
@@ -79,11 +93,13 @@ export default function BackfillModal({ onSuccess }: BackfillModalProps) {
     return (
         <>
             <button
-                onClick={() => setIsOpen(true)}
-                className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm"
+                onClick={() => canWrite && setIsOpen(true)}
+                disabled={!canWrite}
+                title={canWrite ? undefined : 'Unlock on the main dashboard first'}
+                className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-45"
             >
-                <Plus className="w-4 h-4" />
-                Log Past Data
+                {canWrite ? <Plus className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                {canWrite ? 'Log Past Data' : 'Locked'}
             </button>
 
             <AnimatePresence>

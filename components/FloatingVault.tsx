@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DailyRecord } from '@/lib/db';
 import { Gift, X, Plus, Clock, Lock, CheckCircle2, Dumbbell, Timer, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePasscode } from '@/lib/usePasscode';
 
 interface Purchase {
     id: number;
@@ -47,6 +46,7 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
             const res = await fetch('/api/vault', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
                 body: JSON.stringify({ item_name: newItemName, cost: parseInt(newItemCost) })
             });
             const data = await res.json();
@@ -67,6 +67,7 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
         try {
             const res = await fetch(`/api/vault?id=${id}`, {
                 method: 'DELETE',
+                credentials: 'same-origin',
             });
             if (res.ok) {
                 setPurchases(p => p.filter(purchase => purchase.id !== id));

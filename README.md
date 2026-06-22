@@ -56,6 +56,13 @@ npm install
 cp .env.example .env.local
 ```
 
+写入数据需要先在页面输入解锁码。生产环境必须配置:
+
+```bash
+DASHBOARD_PASSCODE="your-unlock-code"
+DASHBOARD_AUTH_SECRET="generate-with: openssl rand -hex 32"
+```
+
 ### 3. 初始化数据库
 
 ```bash

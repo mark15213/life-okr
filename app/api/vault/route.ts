@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { hasValidAuthSession } from '@/lib/auth';
 
 export async function GET() {
     try {
@@ -15,6 +16,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    if (!hasValidAuthSession(request)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const body = await request.json();
         const { item_name, cost } = body;
@@ -40,6 +45,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+    if (!hasValidAuthSession(request)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');

@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { ensureTodayRecord, sql } from '@/lib/db';
+import { hasValidAuthSession } from '@/lib/auth';
 
-export async function POST() {
+export async function POST(request: Request) {
+  if (!hasValidAuthSession(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     await ensureTodayRecord();
 
