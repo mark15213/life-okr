@@ -75,29 +75,6 @@ export default function Home() {
     mutateRecords();
   };
 
-  const handleAddFocus = async (minutes: number) => {
-    if (!todayRecord) return;
-    const optimisticRecord = { ...todayRecord, focus_minutes: todayRecord.focus_minutes + minutes };
-    mutateToday({ ...todayData, record: optimisticRecord }, false);
-    await fetch('/api/records/focus', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ minutes }),
-    });
-    mutateToday();
-    mutateRecords();
-  };
-
-  const handleAddTask = async () => {
-    if (!todayRecord) return;
-    const optimisticRecord = { ...todayRecord, tasks_completed: todayRecord.tasks_completed + 1 };
-    mutateToday({ ...todayData, record: optimisticRecord }, false);
-    await fetch('/api/records/task', { method: 'POST', credentials: 'same-origin' });
-    mutateToday();
-    mutateRecords();
-  };
-
   const calculateWeeklyAverage = (field: keyof DailyRecord) => {
     const weekRecords = displayRecords.slice(0, 7);
     if (weekRecords.length === 0) return 0;
@@ -216,15 +193,11 @@ export default function Home() {
             todayMinutes={displayFocusMinutesToday}
             weeklyAverage={calculateWeeklyAverage('focus_minutes')}
             monthlyAverage={calculateMonthlyAverage('focus_minutes')}
-            onAddFocus={handleAddFocus}
-            isAuthed={isAuthed}
           />
           <TaskCard
             todayTasks={displayTasksCompletedToday}
             weeklyTotal={calculateTotal('tasks_completed', 7)}
             monthlyTotal={calculateTotal('tasks_completed', 30)}
-            onAddTask={handleAddTask}
-            isAuthed={isAuthed}
           />
           <TokenCard
             todayTotal={todayTokens}

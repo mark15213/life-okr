@@ -1,33 +1,19 @@
 'use client';
 
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Plus } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 interface TaskCardProps {
   todayTasks: number;
   weeklyTotal: number;
   monthlyTotal: number;
-  onAddTask: () => Promise<void>;
-  isAuthed: boolean;
 }
 
 export default function TaskCard({
   todayTasks,
   weeklyTotal,
   monthlyTotal,
-  onAddTask,
-  isAuthed,
 }: TaskCardProps) {
-  const [loading, setLoading] = useState(false);
-
-  const handleAddTask = async () => {
-    if (!isAuthed) return;
-    setLoading(true);
-    await onAddTask();
-    setLoading(false);
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -55,20 +41,6 @@ export default function TaskCard({
           {todayTasks}
         </motion.div>
         <div className="mt-2 text-sm text-zinc-400 font-medium">Today&apos;s Tasks</div>
-      </div>
-
-      {/* Add Task Button */}
-      <div className="mb-8 h-[50px] flex items-center justify-center">
-        <motion.button
-          whileHover={isAuthed ? { scale: 1.02 } : {}}
-          whileTap={isAuthed ? { scale: 0.98 } : {}}
-          onClick={handleAddTask}
-          disabled={loading || !isAuthed}
-          className="w-full h-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-2xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-        >
-          <Plus className="w-5 h-5 transition-transform group-hover:rotate-90" />
-          <span className="whitespace-nowrap">Complete a Task</span>
-        </motion.button>
       </div>
 
       {/* Statistics Footer */}

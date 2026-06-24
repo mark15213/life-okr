@@ -32,6 +32,14 @@ export default function PushupCard({
   // If true, the user has clicked "Workout" and is being prompted for calories
   const [showCaloriesInput, setShowCaloriesInput] = useState(false);
 
+  const actionButtonClass = isAuthed
+    ? 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200/80 disabled:opacity-40 disabled:cursor-not-allowed'
+    : 'bg-zinc-100 text-zinc-300 border-zinc-200 cursor-not-allowed shadow-none';
+  const actionIconClass = isAuthed
+    ? 'text-zinc-400 group-hover:text-zinc-700'
+    : 'text-zinc-300';
+  const actionDeltaClass = isAuthed ? 'text-zinc-400' : 'text-zinc-300';
+
   const handleCigarette = async () => {
     if (!isAuthed) return;
     setLoading(true);
@@ -97,12 +105,12 @@ export default function PushupCard({
           whileTap={isAuthed ? { scale: 0.98 } : {}}
           onClick={handleCigarette}
           disabled={loading || !isAuthed || showCaloriesInput}
-          className="flex flex-col items-center justify-center gap-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium py-3 px-3 rounded-2xl border border-zinc-200/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed group h-20"
+          className={`flex flex-col items-center justify-center gap-1.5 font-medium py-3 px-3 rounded-2xl border transition-all group h-20 ${actionButtonClass}`}
         >
-          <Cigarette className="w-5 h-5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
+          <Cigarette className={`w-5 h-5 transition-colors ${actionIconClass}`} />
           <div className="flex items-center gap-1 text-sm">
             <span>Smoke</span>
-            <span className="text-xs text-zinc-400">+100</span>
+            <span className={`text-xs ${actionDeltaClass}`}>+100</span>
           </div>
         </motion.button>
 
@@ -119,12 +127,12 @@ export default function PushupCard({
                 whileTap={isAuthed ? { scale: 0.98 } : {}}
                 onClick={handleExerciseClick}
                 disabled={loading || !isAuthed}
-                className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 font-medium py-3 px-3 rounded-2xl border border-zinc-200/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed group absolute inset-0"
+                className={`w-full h-full flex flex-col items-center justify-center gap-1.5 font-medium py-3 px-3 rounded-2xl border transition-all group absolute inset-0 ${actionButtonClass}`}
               >
-                <Dumbbell className="w-5 h-5 text-zinc-400 group-hover:text-zinc-700 transition-colors" />
+                <Dumbbell className={`w-5 h-5 transition-colors ${actionIconClass}`} />
                 <div className="flex items-center gap-1 text-sm">
                   <span>Workout</span>
-                  <span className="text-xs text-zinc-400">-100</span>
+                  <span className={`text-xs ${actionDeltaClass}`}>-100</span>
                 </div>
               </motion.button>
             ) : (
