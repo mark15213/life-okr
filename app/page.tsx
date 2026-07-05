@@ -6,6 +6,7 @@ import PushupCard from '@/components/PushupCard';
 import FocusCard from '@/components/FocusCard';
 import TaskCard from '@/components/TaskCard';
 import TokenCard from '@/components/TokenCard';
+import DailyWordBanner from '@/components/DailyWordBanner';
 import FloatingVault from '@/components/FloatingVault';
 import useSWR from 'swr';
 import type { DailyRecord, TokenUsageRow } from '@/lib/db';
@@ -180,7 +181,9 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-7 lg:gap-10 2xl:gap-12 mb-12">
+        <DailyWordBanner isAuthed={isAuthed} />
+
+        <div className="mb-12 grid grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-5 lg:gap-6 2xl:gap-7">
           <PushupCard
             balance={cumulativeBalance}
             cigarettes={todayRecord.cigarettes}

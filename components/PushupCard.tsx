@@ -33,8 +33,8 @@ export default function PushupCard({
   const [showCaloriesInput, setShowCaloriesInput] = useState(false);
 
   const actionButtonClass = isAuthed
-    ? 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200/80 disabled:opacity-40 disabled:cursor-not-allowed'
-    : 'bg-zinc-100 text-zinc-300 border-zinc-200 cursor-not-allowed shadow-none';
+    ? 'bg-white hover:bg-zinc-50 text-zinc-700 border-zinc-200/80 disabled:opacity-40 disabled:cursor-not-allowed'
+    : 'bg-zinc-50 text-zinc-300 border-zinc-200 cursor-not-allowed shadow-none';
   const actionIconClass = isAuthed
     ? 'text-zinc-400 group-hover:text-zinc-700'
     : 'text-zinc-300';
@@ -68,44 +68,43 @@ export default function PushupCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      whileHover={{ y: -5, boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.05)" }}
-      className="relative min-h-[520px] rounded-[2rem] p-7 sm:p-8 xl:p-9 bg-white/90 backdrop-blur-xl border border-zinc-200/70 shadow-[0_18px_55px_rgba(15,23,42,0.07)] transition-all duration-500 overflow-hidden flex flex-col justify-between"
+      whileHover={{ y: -3, boxShadow: '0 18px 40px -18px rgba(15, 23, 42, 0.22)' }}
+      className="relative flex min-h-[390px] flex-col overflow-hidden rounded-lg border border-zinc-200/80 bg-white/85 p-6 shadow-[0_10px_30px_rgba(15,23,42,0.05)] backdrop-blur-md transition-all duration-300"
     >
-      {/* Top Header Area */}
-      <div className="flex justify-between items-start mb-10">
-        <h2 className="text-zinc-500 text-sm font-semibold uppercase tracking-widest flex items-center gap-2 leading-none">
+      <div className="mb-7 flex items-start justify-between">
+        <h2 className="flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50">
           {isDebt ? (
-            <AlertTriangle className="w-4 h-4 text-zinc-400" />
+              <AlertTriangle className="h-4 w-4 text-rose-500" />
           ) : (
-            <Activity className="w-4 h-4 text-zinc-400" />
+              <Activity className="h-4 w-4 text-emerald-500" />
           )}
+          </span>
           {cardTitle}
         </h2>
       </div>
 
-      {/* Main Display */}
-      <div className="text-center mb-10 flex-1 flex flex-col justify-center">
+      <div className="flex flex-1 flex-col items-center justify-center text-center">
         <motion.div
           key={balance}
           initial={{ scale: 1.1, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="text-6xl sm:text-7xl font-light tracking-tight text-zinc-900 tabular-nums"
+          className="text-5xl font-light tracking-tight text-zinc-900 tabular-nums sm:text-6xl"
         >
           {displayValue}
         </motion.div>
-        <div className="mt-2 text-sm text-zinc-400 font-medium">
+        <div className="mt-2 text-sm font-medium text-zinc-400">
           {isDebt ? 'Pushups Owed' : balance === 0 ? 'Balanced' : 'Extra Pushups'}
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-4 mb-8 relative">
+      <div className="relative mb-5 grid grid-cols-2 gap-2">
         <motion.button
           whileHover={isAuthed ? { scale: 1.02 } : {}}
           whileTap={isAuthed ? { scale: 0.98 } : {}}
           onClick={handleCigarette}
           disabled={loading || !isAuthed || showCaloriesInput}
-          className={`flex flex-col items-center justify-center gap-1.5 font-medium py-3 px-3 rounded-2xl border transition-all group h-20 ${actionButtonClass}`}
+          className={`group flex h-14 items-center justify-center gap-2 rounded-lg border px-3 py-3 font-medium transition-all ${actionButtonClass}`}
         >
           <Cigarette className={`w-5 h-5 transition-colors ${actionIconClass}`} />
           <div className="flex items-center gap-1 text-sm">
@@ -114,7 +113,7 @@ export default function PushupCard({
           </div>
         </motion.button>
 
-        <div className="relative h-20">
+        <div className="relative h-14">
           <AnimatePresence mode="wait">
             {!showCaloriesInput ? (
               <motion.button
@@ -127,7 +126,7 @@ export default function PushupCard({
                 whileTap={isAuthed ? { scale: 0.98 } : {}}
                 onClick={handleExerciseClick}
                 disabled={loading || !isAuthed}
-                className={`w-full h-full flex flex-col items-center justify-center gap-1.5 font-medium py-3 px-3 rounded-2xl border transition-all group absolute inset-0 ${actionButtonClass}`}
+                className={`absolute inset-0 flex h-full w-full items-center justify-center gap-2 rounded-lg border px-3 py-3 font-medium transition-all group ${actionButtonClass}`}
               >
                 <Dumbbell className={`w-5 h-5 transition-colors ${actionIconClass}`} />
                 <div className="flex items-center gap-1 text-sm">
@@ -143,7 +142,7 @@ export default function PushupCard({
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.15 }}
                 onSubmit={submitExercise}
-                className="w-full h-full flex flex-col gap-1 absolute inset-0 bg-white rounded-2xl border border-zinc-200 p-2 shadow-sm"
+                className="absolute inset-0 flex h-full w-full flex-col gap-1 rounded-lg border border-zinc-200 bg-white p-1.5 shadow-sm"
               >
                 <input
                   type="number"
@@ -153,21 +152,21 @@ export default function PushupCard({
                   placeholder="Calories?"
                   min="0"
                   disabled={loading}
-                  className="w-full bg-zinc-50 border border-zinc-200 text-zinc-800 placeholder-zinc-400 px-2 flex-1 text-sm rounded-lg font-medium focus:outline-none focus:ring-1 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all text-center"
+                  className="w-full flex-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 text-center text-xs font-medium text-zinc-800 placeholder-zinc-400 transition-all focus:border-zinc-300 focus:outline-none focus:ring-1 focus:ring-zinc-900/10"
                 />
-                <div className="flex gap-1 h-6">
+                <div className="flex h-5 gap-1">
                   <button
                     type="button"
                     onClick={() => setShowCaloriesInput(false)}
                     disabled={loading}
-                    className="flex-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-md text-[10px] uppercase font-bold tracking-wider transition-colors disabled:opacity-50"
+                    className="flex-1 rounded-md bg-zinc-100 text-[10px] font-bold uppercase tracking-wider text-zinc-600 transition-colors hover:bg-zinc-200 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-white rounded-md text-[10px] uppercase font-bold tracking-wider transition-colors disabled:opacity-50"
+                    className="flex-1 rounded-md bg-zinc-900 text-[10px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-zinc-800 disabled:opacity-50"
                   >
                     Save
                   </button>
@@ -178,18 +177,20 @@ export default function PushupCard({
         </div>
       </div>
 
-      {/* Today's Stats Footer */}
-      <div className="pt-5 border-t border-zinc-100 flex justify-between items-center text-zinc-500">
-        <div className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Today</div>
-        <div className="flex gap-6 text-sm">
-          <div className="flex items-center gap-1.5">
-            <Cigarette className="w-3.5 h-3.5 opacity-60" />
-            <span className="font-medium text-zinc-700">{cigarettes}</span>
+      <div className="grid grid-cols-2 gap-3 border-t border-zinc-100 pt-4">
+        <div>
+          <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+            <Cigarette className="h-3.5 w-3.5" />
+            Smoke
           </div>
-          <div className="flex items-center gap-1.5">
-            <Dumbbell className="w-3.5 h-3.5 opacity-60" />
-            <span className="font-medium text-zinc-700">{exercises}</span>
+          <div className="text-lg font-semibold text-zinc-900 tabular-nums">{cigarettes}</div>
+        </div>
+        <div className="text-right">
+          <div className="mb-1 flex items-center justify-end gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+            <Dumbbell className="h-3.5 w-3.5" />
+            Workout
           </div>
+          <div className="text-lg font-semibold text-zinc-900 tabular-nums">{exercises}</div>
         </div>
       </div>
     </motion.div>
