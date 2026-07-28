@@ -8,9 +8,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    await ensureTodayRecord();
-
-    const today = new Date().toISOString().split('T')[0];
+    // See focus/route.ts: use the ensured row's own date so this can't disagree with
+    // ensureTodayRecord's APP_TZ notion of "today" on a UTC server.
+    const { date: today } = await ensureTodayRecord();
 
     const rows = await sql`
       UPDATE daily_records

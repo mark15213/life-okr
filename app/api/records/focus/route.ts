@@ -17,9 +17,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await ensureTodayRecord();
-
-    const today = new Date().toISOString().split('T')[0];
+    // Take the date from the row we just ensured rather than deriving "today" a second
+    // time. ensureTodayRecord pins to APP_TZ; re-deriving it here with toISOString would
+    // give the server's UTC date, and Vercel runs in UTC — so between 00:00 and 08:00
+    // Asia/Shanghai the UPDATE targeted yesterday's row, or matched nothing at all.
+    const { date: today } = await ensureTodayRecord();
 
     const rows = await sql`
       UPDATE daily_records

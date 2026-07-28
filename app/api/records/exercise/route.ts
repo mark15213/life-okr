@@ -11,9 +11,9 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const calories = typeof body.calories === 'number' ? body.calories : 0;
 
-    await ensureTodayRecord();
-
-    const today = new Date().toISOString().split('T')[0];
+    // See focus/route.ts: use the ensured row's own date so this can't disagree with
+    // ensureTodayRecord's APP_TZ notion of "today" on a UTC server.
+    const { date: today } = await ensureTodayRecord();
 
     const rows = await sql`
       UPDATE daily_records
