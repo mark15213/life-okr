@@ -164,20 +164,93 @@ export async function upsertTokenUsage(
   }
 }
 
+export const CATEGORY_KEYS = ['work', 'study', 'hustle', 'life', 'uncategorized'] as const;
+export type CategoryKey = (typeof CATEGORY_KEYS)[number];
+
+export interface CategoryStatRow {
+  date: string;
+  category: CategoryKey;
+  focus_minutes: number;
+  tasks_completed: number;
+}
+
+export async function getCategoryStats(days: number = 365): Promise<CategoryStatRow[]> {
+  if (!Number.isInteger(days) || days <= 0) {
+    throw new Error('Days parameter must be a positive integer');
+  }
+  try {
+    // Cut off in APP_TZ rather than with CURRENT_DATE — that would be the database's UTC
+    // calendar, which drifts a day away from the dates the rest of the app writes.
+    const cutoff = new Date(Date.now() - (days - 1) * 86_400_000)
+      .toLocaleDateString('en-CA', { timeZone: APP_TZ });
+    const rows = await sql`
+      SELECT date, category, focus_minutes, tasks_completed
+      FROM daily_category_stats
+      WHERE date >= ${cutoff}
+      ORDER BY date DESC, category ASC
+    `;
+    return rows.map((r) => ({
+      date: typeof r.date === 'string' ? r.date.slice(0, 10) : (r.date as Date).toISOString().slice(0, 10),
+      category: r.category as CategoryKey,
+      focus_minutes: Number(r.focus_minutes),
+      tasks_completed: Number(r.tasks_completed),
+    }));
+  } catch (error) {
+    // Deliberately non-throwing, like getCumulativePushupBalance: the analytics page renders
+    // its other sections fine without this, and a missing table must not 500 the whole route.
+    console.error('Error fetching category stats:', error);
+    return [];
+  }
+}
+
+export interface TicktickCategoryTotals {
+  focusMinutes: number;
+  tasksCompleted: number;
+}
+
 export async function upsertTicktickSync(
   date: string,
   focusMinutes: number,
-  tasksCompleted: number
+  tasksCompleted: number,
+  byCategory?: Record<CategoryKey, TicktickCategoryTotals>
 ): Promise<void> {
   try {
-    await sql`
-      INSERT INTO daily_records (date, focus_minutes_ticktick, tasks_completed_ticktick, ticktick_synced_at)
-      VALUES (${date}, ${focusMinutes}, ${tasksCompleted}, NOW())
-      ON CONFLICT (date) DO UPDATE SET
-        focus_minutes_ticktick = EXCLUDED.focus_minutes_ticktick,
-        tasks_completed_ticktick = EXCLUDED.tasks_completed_ticktick,
-        ticktick_synced_at = NOW()
-    `;
+    await sql.begin(async (t) => {
+      // postgres.js declares TransactionSql as Omit<Sql, …>, and Omit drops call signatures —
+      // so the type says `t` isn't callable even though it is at runtime. Cast back.
+      const tx = t as unknown as postgres.Sql;
+
+      await tx`
+        INSERT INTO daily_records (date, focus_minutes_ticktick, tasks_completed_ticktick, ticktick_synced_at)
+        VALUES (${date}, ${focusMinutes}, ${tasksCompleted}, NOW())
+        ON CONFLICT (date) DO UPDATE SET
+          focus_minutes_ticktick = EXCLUDED.focus_minutes_ticktick,
+          tasks_completed_ticktick = EXCLUDED.tasks_completed_ticktick,
+          ticktick_synced_at = NOW()
+      `;
+
+      if (!byCategory) return;
+
+      // Delete-then-insert, not upsert: a category that drops back to zero (a task deleted
+      // in TickTick, say) must lose its row entirely. A stale row left behind would keep
+      // being subtracted from the day's total on every render, forever.
+      await tx`DELETE FROM daily_category_stats WHERE date = ${date}`;
+
+      const rows = CATEGORY_KEYS
+        .map((category) => ({
+          date,
+          category,
+          focus_minutes: byCategory[category]?.focusMinutes ?? 0,
+          tasks_completed: byCategory[category]?.tasksCompleted ?? 0,
+        }))
+        .filter((r) => r.focus_minutes > 0 || r.tasks_completed > 0);
+
+      if (rows.length > 0) {
+        await tx`
+          INSERT INTO daily_category_stats ${tx(rows, 'date', 'category', 'focus_minutes', 'tasks_completed')}
+        `;
+      }
+    });
   } catch (error) {
     console.error(`Error upserting ticktick sync for ${date}:`, error);
     throw new Error(`Failed to upsert ticktick sync: ${error instanceof Error ? error.message : String(error)}`);

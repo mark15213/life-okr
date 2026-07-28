@@ -1,7 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import DashboardAnalytics from '@/components/DashboardAnalytics';
+import CategoryBreakdown from '@/components/CategoryBreakdown';
 import BackfillModal from '@/components/BackfillModal';
 import type { DailyRecord, TokenUsageRow } from '@/lib/db';
 import { withTicktickSummed } from '@/lib/utils';
@@ -15,18 +17,23 @@ export default function AnalyticsPage() {
     const { data: recordsData, mutate } = useSWR('/api/records?days=365', fetcher);
     const { data: tokensData } = useSWR('/api/tokens?days=365', fetcher);
 
-    const baseRecords: DailyRecord[] = recordsData?.records || [];
-    const tokenEntries: TokenUsageRow[] = tokensData?.entries || [];
     const loading = !recordsData || !tokensData;
 
-    const tokensByDate = new Map<string, number>();
-    for (const e of tokenEntries) {
-      tokensByDate.set(e.date, (tokensByDate.get(e.date) ?? 0) + e.total_tokens);
-    }
-    const records: DailyRecordWithTokens[] = baseRecords.map((r) => ({
-      ...withTicktickSummed(r),
-      total_tokens: tokensByDate.get(r.date) ?? 0,
-    }));
+    // Memoized so the two consumers below don't each recompute on every render. The `|| []`
+    // fallbacks live inside the callback on purpose — hoisting them would mint a fresh array
+    // identity every pass and defeat the memo (and the consumers' own memos with it).
+    const records: DailyRecordWithTokens[] = useMemo(() => {
+      const baseRecords: DailyRecord[] = recordsData?.records || [];
+      const tokenEntries: TokenUsageRow[] = tokensData?.entries || [];
+      const tokensByDate = new Map<string, number>();
+      for (const e of tokenEntries) {
+        tokensByDate.set(e.date, (tokensByDate.get(e.date) ?? 0) + e.total_tokens);
+      }
+      return baseRecords.map((r) => ({
+        ...withTicktickSummed(r),
+        total_tokens: tokensByDate.get(r.date) ?? 0,
+      }));
+    }, [recordsData, tokensData]);
 
     const fetchData = () => {
         mutate();
@@ -64,7 +71,10 @@ export default function AnalyticsPage() {
                     </div>
                 </header>
 
-                <DashboardAnalytics records={records} />
+                <div className="w-full space-y-8">
+                    <DashboardAnalytics records={records} />
+                    <CategoryBreakdown records={records} />
+                </div>
             </div>
         </main>
     );

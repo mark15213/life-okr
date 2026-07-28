@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test scripts/lib/*.test.ts",
     "setup-db": "tsx scripts/setup-db.ts",
+    "migrate-category-stats": "tsx scripts/migrate-add-category-stats.ts",
     "report-tokens": "tsx scripts/report-tokens.ts",
     "sync-ticktick": "tsx scripts/sync-ticktick.ts"
   },

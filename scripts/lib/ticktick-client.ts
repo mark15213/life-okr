@@ -1,4 +1,12 @@
-import { countCompletedTasksToday, sumFocusMinutesToday, type TickTickPomodoro, type TickTickTask } from './ticktick-aggregate';
+import {
+  categoryFromProjectName,
+  countCompletedTasksByCategory,
+  sumFocusMinutesByCategory,
+  type CategorizedTotal,
+  type Category,
+  type TickTickPomodoro,
+  type TickTickTask,
+} from './ticktick-aggregate';
 import { getLocalDayRange } from './ticktick-date';
 import { loadSession, saveSession } from './ticktick-session';
 
@@ -11,6 +19,10 @@ export interface UnofficialClientConfig {
 interface SignonResponse {
   token: string;
   userId: string;
+}
+
+interface BatchCheckResponse {
+  projectProfiles?: Array<{ id?: string; name?: string }>;
 }
 
 const X_DEVICE = JSON.stringify({
@@ -40,18 +52,43 @@ export class UnofficialClient {
 
   constructor(private readonly cfg: UnofficialClientConfig) {}
 
-  async getFocusMinutesToday(): Promise<number> {
+  /**
+   * projectId → category, built from the user's TickTick lists. Only ids whose list name
+   * matches one of our four categories end up here; everything absent (Inbox included, in
+   * either locale) falls through to `uncategorized` at lookup time.
+   *
+   * Call this first and awaited: it also warms the session cookie, which keeps the two
+   * parallel fetches below from each racing into their own `login()`.
+   */
+  async getProjectMap(): Promise<Map<string, Category>> {
+    await this.ensureSession();
+    const body = await this.authedGet<BatchCheckResponse>(
+      'https://api.ticktick.com/api/v2/batch/check/0'
+    );
+    const map = new Map<string, Category>();
+    for (const p of body?.projectProfiles ?? []) {
+      if (!p?.id) continue;
+      const category = categoryFromProjectName(p.name);
+      if (category !== 'uncategorized') map.set(p.id, category);
+    }
+    return map;
+  }
+
+  async getFocusMinutesToday(): Promise<CategorizedTotal> {
     await this.ensureSession();
     const range = getLocalDayRange(new Date());
 
     // The TickTick pomodoros/timeline endpoint takes a `to` (ms) param and returns sessions
     // ending before that point, newest first. We query "now" — today's sessions are all included.
+    // Each session carries a `tasks[]` of {taskId, title, projectName, startTime, endTime};
+    // note it exposes the list *name* only, never a projectId, so focus is categorized by
+    // name while tasks below are categorized by id.
     const url = `https://api.ticktick.com/api/v2/pomodoros/timeline?to=${Date.now()}`;
     const pomodoros = await this.authedGet<TickTickPomodoro[]>(url);
-    return sumFocusMinutesToday(pomodoros ?? [], range);
+    return sumFocusMinutesByCategory(pomodoros ?? [], range);
   }
 
-  async getCompletedTaskCountToday(): Promise<number> {
+  async getCompletedTaskCountToday(projectMap: Map<string, Category>): Promise<CategorizedTotal> {
     await this.ensureSession();
     const now = new Date();
     const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
@@ -62,7 +99,7 @@ export class UnofficialClient {
     const url = `https://api.ticktick.com/api/v2/project/all/completed/?from=${encodeURIComponent(fmtLocal(startOfToday))}&to=${encodeURIComponent(fmtLocal(endOfToday))}&limit=200`;
     const tasks = await this.authedGet<TickTickTask[]>(url);
     const range = getLocalDayRange(now);
-    return countCompletedTasksToday(tasks ?? [], range);
+    return countCompletedTasksByCategory(tasks ?? [], range, projectMap);
   }
 
   private async ensureSession(): Promise<void> {

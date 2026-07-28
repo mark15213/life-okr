@@ -25,3 +25,15 @@ CREATE TABLE IF NOT EXISTS token_usage (
 );
 
 CREATE INDEX IF NOT EXISTS idx_token_usage_date ON token_usage(date DESC);
+
+-- Per-category breakdown of the TickTick-synced focus minutes / completed tasks.
+-- daily_records keeps the authoritative totals; these rows only say how they split.
+-- No extra index: PRIMARY KEY (date, category) already gives a date-leading btree.
+CREATE TABLE IF NOT EXISTS daily_category_stats (
+  date            DATE NOT NULL REFERENCES daily_records(date) ON DELETE CASCADE,
+  category        TEXT NOT NULL CHECK (category IN ('work','study','hustle','life','uncategorized')),
+  focus_minutes   INT  NOT NULL DEFAULT 0,
+  tasks_completed INT  NOT NULL DEFAULT 0,
+  updated_at      TIMESTAMP DEFAULT NOW(),
+  PRIMARY KEY (date, category)
+);

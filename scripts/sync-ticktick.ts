@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { UnofficialClient } from './lib/ticktick-client';
+import { CATEGORIES, type Category } from './lib/ticktick-aggregate';
 import { getLocalDateString } from './lib/ticktick-date';
 
 // dotenv must run before lib/db is imported — lib/db initializes the postgres
@@ -28,10 +29,29 @@ async function main() {
     sessionCachePath: path.resolve(process.cwd(), '.ticktick-session.json'),
   });
 
-  const [tasksCompleted, focusMinutes] = await Promise.all([
-    unofficial.getCompletedTaskCountToday(),
+  // Fetched first and awaited, not folded into the Promise.all below, for two reasons:
+  // it warms the session cookie (ensureSession is not concurrency-safe, so parallel cold
+  // calls would each run login()), and a failure here must not stop the totals from being
+  // written — we degrade to "everything uncategorized" instead.
+  let projectMap = new Map<string, Category>();
+  try {
+    projectMap = await unofficial.getProjectMap();
+  } catch (e) {
+    console.warn('⚠️  could not load TickTick lists, categorizing everything as uncategorized:',
+      e instanceof Error ? e.message : e);
+  }
+
+  const [tasks, focus] = await Promise.all([
+    unofficial.getCompletedTaskCountToday(projectMap),
     unofficial.getFocusMinutesToday(),
   ]);
+
+  const byCategory = Object.fromEntries(
+    CATEGORIES.map((c) => [c, {
+      focusMinutes: focus.byCategory[c],
+      tasksCompleted: tasks.byCategory[c],
+    }])
+  ) as Record<Category, { focusMinutes: number; tasksCompleted: number }>;
 
   // Must match the local-day window used by getCompletedTaskCountToday /
   // getFocusMinutesToday. Using UTC date here (via toISOString) is a bug for
@@ -39,8 +59,14 @@ async function main() {
   // would query today's local data but stamp it onto yesterday's UTC-named row,
   // wiping yesterday with zeros.
   const today = getLocalDateString(new Date());
-  await upsertTicktickSync(today, focusMinutes, tasksCompleted);
-  console.log(`✅ ticktick sync ${today}: focus=${focusMinutes}m, tasks=${tasksCompleted}`);
+  await upsertTicktickSync(today, focus.total, tasks.total, byCategory);
+
+  const breakdown = CATEGORIES
+    .filter((c) => byCategory[c].focusMinutes > 0 || byCategory[c].tasksCompleted > 0)
+    .map((c) => `${c}=${byCategory[c].focusMinutes}m/${byCategory[c].tasksCompleted}t`)
+    .join(' ');
+  console.log(`✅ ticktick sync ${today}: focus=${focus.total}m, tasks=${tasks.total}`);
+  console.log(`   by category: ${breakdown || '(none)'}`);
 }
 
 main()

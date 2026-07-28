@@ -46,6 +46,19 @@ async function setupDatabase() {
       CREATE INDEX IF NOT EXISTS idx_vault_purchases_created_at ON vault_purchases(created_at DESC)
     `;
 
+    console.log('Creating daily_category_stats table...');
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS daily_category_stats (
+        date            DATE NOT NULL REFERENCES daily_records(date) ON DELETE CASCADE,
+        category        TEXT NOT NULL CHECK (category IN ('work','study','hustle','life','uncategorized')),
+        focus_minutes   INT  NOT NULL DEFAULT 0,
+        tasks_completed INT  NOT NULL DEFAULT 0,
+        updated_at      TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (date, category)
+      )
+    `;
+
     console.log('✅ Database setup complete!');
   } catch (error) {
     console.error('❌ Error setting up database:', error);
