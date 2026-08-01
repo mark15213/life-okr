@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import { UnofficialClient } from './lib/ticktick-client';
 import { CATEGORIES, type Category } from './lib/ticktick-aggregate';
-import { getLocalDateString } from './lib/ticktick-date';
+import { getLocalDateString, recentLocalDays } from './lib/ticktick-date';
 
 // dotenv must run before lib/db is imported — lib/db initializes the postgres
 // client at module load using process.env.POSTGRES_URL.
@@ -41,32 +41,49 @@ async function main() {
       e instanceof Error ? e.message : e);
   }
 
-  const [tasks, focus] = await Promise.all([
-    unofficial.getCompletedTaskCountToday(projectMap),
-    unofficial.getFocusMinutesToday(),
+  // Re-sync a trailing window, not just today. This job runs off a laptop that sleeps: on
+  // 2026-07-31 the machine slept from 02:10, the last run of that day had already recorded
+  // focus=0, and the four sessions logged from 10:00 onward were lost for good because the
+  // next run stamped a new date and never revisited. Any successful run now repairs the
+  // recent past. Window is small by default — the timeline endpoint only reaches back so far.
+  const days = recentLocalDays(Number(process.env.TICKTICK_SYNC_DAYS ?? 3), new Date());
+  const today = getLocalDateString(new Date());
+
+  const [tasksByDay, focusByDay] = await Promise.all([
+    unofficial.getCompletedTaskCountsByDay(days, projectMap),
+    unofficial.getFocusMinutesByDay(days),
   ]);
 
-  const byCategory = Object.fromEntries(
-    CATEGORIES.map((c) => [c, {
-      focusMinutes: focus.byCategory[c],
-      tasksCompleted: tasks.byCategory[c],
-    }])
-  ) as Record<Category, { focusMinutes: number; tasksCompleted: number }>;
+  for (const { date } of days) {
+    const focus = focusByDay.get(date)!;
+    const tasks = tasksByDay.get(date)!;
+    const isToday = date === today;
 
-  // Must match the local-day window used by getCompletedTaskCountToday /
-  // getFocusMinutesToday. Using UTC date here (via toISOString) is a bug for
-  // users west/east of UTC: between local midnight and UTC midnight the script
-  // would query today's local data but stamp it onto yesterday's UTC-named row,
-  // wiping yesterday with zeros.
-  const today = getLocalDateString(new Date());
-  await upsertTicktickSync(today, focus.total, tasks.total, byCategory);
+    // Today is always written, so deleting a session in TickTick still shows up. A *past*
+    // day reporting all-zero is ambiguous — genuinely empty, or the API window no longer
+    // reaches it — and overwriting would wipe real history, which has bitten this sync
+    // before. Filling a gap is safe; zeroing a settled day is not, so we skip it.
+    if (!isToday && focus.total === 0 && tasks.total === 0) {
+      console.log(`↷ ticktick sync ${date}: nothing reported, leaving stored value untouched`);
+      continue;
+    }
 
-  const breakdown = CATEGORIES
-    .filter((c) => byCategory[c].focusMinutes > 0 || byCategory[c].tasksCompleted > 0)
-    .map((c) => `${c}=${byCategory[c].focusMinutes}m/${byCategory[c].tasksCompleted}t`)
-    .join(' ');
-  console.log(`✅ ticktick sync ${today}: focus=${focus.total}m, tasks=${tasks.total}`);
-  console.log(`   by category: ${breakdown || '(none)'}`);
+    const byCategory = Object.fromEntries(
+      CATEGORIES.map((c) => [c, {
+        focusMinutes: focus.byCategory[c],
+        tasksCompleted: tasks.byCategory[c],
+      }])
+    ) as Record<Category, { focusMinutes: number; tasksCompleted: number }>;
+
+    await upsertTicktickSync(date, focus.total, tasks.total, byCategory);
+
+    const breakdown = CATEGORIES
+      .filter((c) => byCategory[c].focusMinutes > 0 || byCategory[c].tasksCompleted > 0)
+      .map((c) => `${c}=${byCategory[c].focusMinutes}m/${byCategory[c].tasksCompleted}t`)
+      .join(' ');
+    console.log(`✅ ticktick sync ${date}: focus=${focus.total}m, tasks=${tasks.total}`);
+    console.log(`   by category: ${breakdown || '(none)'}`);
+  }
 }
 
 main()

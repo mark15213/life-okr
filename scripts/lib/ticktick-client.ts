@@ -7,7 +7,7 @@ import {
   type TickTickPomodoro,
   type TickTickTask,
 } from './ticktick-aggregate';
-import { getLocalDayRange } from './ticktick-date';
+import type { LocalDay } from './ticktick-date';
 import { loadSession, saveSession } from './ticktick-session';
 
 export interface UnofficialClientConfig {
@@ -74,32 +74,62 @@ export class UnofficialClient {
     return map;
   }
 
-  async getFocusMinutesToday(): Promise<CategorizedTotal> {
+  /**
+   * Focus minutes per local day, keyed by `LocalDay.date`. One network call covers the whole
+   * window: the timeline endpoint returns sessions newest-first ending before `to`, so asking
+   * for "now" yields every recent session and we bucket them locally.
+   *
+   * Each session carries a `tasks[]` of {taskId, title, projectName, startTime, endTime}; note
+   * it exposes the list *name* only, never a projectId, so focus is categorized by name while
+   * completed tasks are categorized by id.
+   */
+  async getFocusMinutesByDay(days: LocalDay[]): Promise<Map<string, CategorizedTotal>> {
     await this.ensureSession();
-    const range = getLocalDayRange(new Date());
 
-    // The TickTick pomodoros/timeline endpoint takes a `to` (ms) param and returns sessions
-    // ending before that point, newest first. We query "now" — today's sessions are all included.
-    // Each session carries a `tasks[]` of {taskId, title, projectName, startTime, endTime};
-    // note it exposes the list *name* only, never a projectId, so focus is categorized by
-    // name while tasks below are categorized by id.
     const url = `https://api.ticktick.com/api/v2/pomodoros/timeline?to=${Date.now()}`;
-    const pomodoros = await this.authedGet<TickTickPomodoro[]>(url);
-    return sumFocusMinutesByCategory(pomodoros ?? [], range);
+    const pomodoros = (await this.authedGet<TickTickPomodoro[]>(url)) ?? [];
+
+    // The endpoint caps how far back it reaches, so a long window can silently run past the
+    // oldest session it will return. Surface that rather than reporting a confident zero;
+    // sync-ticktick.ts additionally refuses to overwrite a past day with zeros.
+    const oldestReturned = pomodoros
+      .map((p) => new Date(p.startTime).getTime())
+      .filter((ms) => Number.isFinite(ms))
+      .sort((a, b) => a - b)[0];
+    const windowStart = days[0]?.range.startMs;
+    if (pomodoros.length > 0 && windowStart !== undefined && oldestReturned > windowStart) {
+      console.warn(
+        `⚠️  pomodoro timeline only reaches back to ${new Date(oldestReturned).toISOString()}, ` +
+        `which is inside the requested window — days before that cannot be verified.`
+      );
+    }
+
+    return new Map(days.map((d) => [d.date, sumFocusMinutesByCategory(pomodoros, d.range)]));
   }
 
-  async getCompletedTaskCountToday(projectMap: Map<string, Category>): Promise<CategorizedTotal> {
+  /** Completed-task counts per local day, keyed by `LocalDay.date`. One call for the window. */
+  async getCompletedTaskCountsByDay(
+    days: LocalDay[],
+    projectMap: Map<string, Category>
+  ): Promise<Map<string, CategorizedTotal>> {
     await this.ensureSession();
-    const now = new Date();
-    const startOfToday = new Date(now); startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999);
 
-    // Unofficial endpoint that includes Inbox tasks (the official /open/v1 endpoint excludes Inbox).
-    // Limit 200 covers a very heavy day; raise if anyone ever closes more than that in 24h.
-    const url = `https://api.ticktick.com/api/v2/project/all/completed/?from=${encodeURIComponent(fmtLocal(startOfToday))}&to=${encodeURIComponent(fmtLocal(endOfToday))}&limit=200`;
-    const tasks = await this.authedGet<TickTickTask[]>(url);
-    const range = getLocalDayRange(now);
-    return countCompletedTasksByCategory(tasks ?? [], range, projectMap);
+    const from = new Date(days[0].range.startMs);
+    const to = new Date(days[days.length - 1].range.endMs - 1);
+
+    // Unofficial endpoint that includes Inbox tasks (the official /open/v1 endpoint excludes
+    // Inbox). It takes local-time strings, not epoch ms — epoch ms returns HTTP 500. Limit is
+    // per request, not per day: 200 covers a very heavy single day, so scale it with the window.
+    const limit = 200 * days.length;
+    const url = `https://api.ticktick.com/api/v2/project/all/completed/?from=${encodeURIComponent(fmtLocal(from))}&to=${encodeURIComponent(fmtLocal(to))}&limit=${limit}`;
+    const tasks = (await this.authedGet<TickTickTask[]>(url)) ?? [];
+    if (tasks.length >= limit) {
+      console.warn(`⚠️  completed-task fetch hit the ${limit}-row limit; counts may be truncated.`);
+    }
+
+    return new Map(
+      days.map((d) => [d.date, countCompletedTasksByCategory(tasks, d.range, projectMap)])
+    );
   }
 
   private async ensureSession(): Promise<void> {
