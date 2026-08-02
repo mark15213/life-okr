@@ -131,9 +131,10 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
                 onClick={() => setIsOpen(true)}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="fixed bottom-8 right-8 z-40 flex items-center gap-3 bg-zinc-900 text-white px-5 py-3.5 rounded-full shadow-2xl shadow-indigo-500/20 border border-zinc-800 hover:bg-zinc-800 transition-colors group"
+                // Width is shared with the tasks pill stacked above, so the two line up as a rail.
+                className="fixed bottom-8 right-8 z-40 w-40 flex items-center gap-3 bg-zinc-900 text-white px-5 py-3.5 rounded-full shadow-2xl shadow-indigo-500/20 border border-zinc-800 hover:bg-zinc-800 transition-colors group"
             >
-                <div className="relative">
+                <div className="relative shrink-0">
                     <Gift className="w-5 h-5 text-amber-400 group-hover:rotate-12 transition-transform" />
                     <AnimatePresence>
                         {showSparkle && (
@@ -148,9 +149,9 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
                         )}
                     </AnimatePresence>
                 </div>
-                <div className="flex flex-col items-start leading-none">
-                    <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-widest mb-0.5">Vault</span>
-                    <span className="font-semibold">¥{vault.balance}</span>
+                <div className="flex flex-col items-start leading-none min-w-0 flex-1">
+                    <span className="w-full text-left text-[10px] text-zinc-400 font-semibold uppercase tracking-widest mb-0.5 truncate">Vault</span>
+                    <span className="w-full text-left font-semibold tabular-nums truncate">¥{vault.balance}</span>
                 </div>
             </motion.button>
 

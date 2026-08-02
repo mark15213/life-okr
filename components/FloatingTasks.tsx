@@ -414,9 +414,13 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 aria-label={isAuthed ? 'Open tasks' : 'Unlock the dashboard to open tasks'}
-                className="fixed bottom-[6.25rem] right-8 z-40 flex items-center gap-3 bg-zinc-900 text-white px-5 py-3.5 rounded-full shadow-2xl shadow-indigo-500/20 border border-zinc-800 hover:bg-zinc-800 transition-colors group"
+                // Fixed width, shared with the vault pill below: the two read as one rail only
+                // if they share an edge, and this label changes length constantly — task count,
+                // then a task title — so an intrinsic width would resize the button under the
+                // cursor every time the state moved.
+                className="fixed bottom-[6.25rem] right-8 z-40 w-40 flex items-center gap-3 bg-zinc-900 text-white px-5 py-3.5 rounded-full shadow-2xl shadow-indigo-500/20 border border-zinc-800 hover:bg-zinc-800 transition-colors group"
             >
-                <div className="relative">
+                <div className="relative shrink-0">
                     {!isAuthed ? (
                         <Lock className="w-5 h-5 text-zinc-400" />
                     ) : session ? (
@@ -434,8 +438,18 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                     )}
                 </div>
 
-                <div className="flex flex-col items-start leading-none">
-                    <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-widest mb-0.5 max-w-[8rem] truncate">
+                <div className="flex flex-col items-start leading-none min-w-0 flex-1">
+                    {/* The eyebrow treatment is for a fixed word. A task title is neither fixed
+                        nor an eyebrow, and uppercase + wide tracking costs it about half its
+                        characters before the truncation bites. */}
+                    <span
+                        className={cn(
+                            'w-full text-left text-[10px] font-semibold mb-0.5 truncate',
+                            session
+                                ? 'text-amber-400/90'
+                                : 'text-zinc-400 uppercase tracking-widest'
+                        )}
+                    >
                         {session ? session.title : 'Tasks'}
                     </span>
                     <span className="font-semibold tabular-nums">
