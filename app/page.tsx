@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import Link from 'next/link';
 import PushupCard from '@/components/PushupCard';
 import FocusCard from '@/components/FocusCard';
@@ -8,6 +8,7 @@ import TaskCard from '@/components/TaskCard';
 import TokenCard from '@/components/TokenCard';
 import DailyWordBanner from '@/components/DailyWordBanner';
 import FloatingVault from '@/components/FloatingVault';
+import FloatingTasks from '@/components/FloatingTasks';
 import useSWR from 'swr';
 import type { DailyRecord, TokenUsageRow } from '@/lib/db';
 import { withTicktickSummed } from '@/lib/utils';
@@ -18,6 +19,14 @@ export default function Home() {
   const { isAuthed, verify } = usePasscode();
   const [passcodeInput, setPasscodeInput] = useState('');
   const [passcodeError, setPasscodeError] = useState(false);
+  const passcodeRef = useRef<HTMLInputElement>(null);
+
+  // The tasks panel needs write access, so a locked visitor is sent to the one control that
+  // grants it rather than being shown a dead button.
+  const focusPasscode = () => {
+    passcodeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    passcodeRef.current?.focus();
+  };
 
   const fetcher = (url: string) => fetch(url).then(res => res.json());
 
@@ -154,6 +163,7 @@ export default function Home() {
               <form onSubmit={handlePasscodeSubmit} className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-zinc-400" />
                 <input
+                  ref={passcodeRef}
                   type="password"
                   value={passcodeInput}
                   onChange={(e) => setPasscodeInput(e.target.value)}
@@ -211,7 +221,8 @@ export default function Home() {
           />
         </div>
 
-        {/* Floating Reward Vault Widget */}
+        {/* Floating action rail: tasks sit above the vault in the bottom-right corner */}
+        <FloatingTasks isAuthed={isAuthed} onRequestUnlock={focusPasscode} />
         <FloatingVault records={displayRecords} todayRecord={withTicktickSummed(todayRecord)} cumulativeBalance={cumulativeBalance} isAuthed={isAuthed} />
       </div>
     </main>

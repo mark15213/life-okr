@@ -9,6 +9,7 @@ import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO } 
 import { motion } from 'framer-motion';
 import { Layers, Timer, CheckCircle2 } from 'lucide-react';
 import type { DailyRecord, CategoryStatRow, CategoryKey } from '@/lib/db';
+import { TASK_LISTS } from '@/lib/ticktick/lists';
 import { cn } from '@/lib/utils';
 
 type CategoryMetric = 'focus' | 'tasks';
@@ -23,11 +24,14 @@ type CategoryMetric = 'focus' | 'tasks';
  * should recede rather than compete with the four real lists.
  */
 const CATEGORY_META: Array<{ key: CategoryKey; label: string; color: string }> = [
-    { key: 'work', label: 'Work', color: '#7c3aed' },
-    { key: 'study', label: 'Study', color: '#0891b2' },
-    { key: 'hustle', label: 'Hustle', color: '#d97706' },
-    { key: 'life', label: 'Life', color: '#e11d48' },
-    { key: 'uncategorized', label: 'Uncategorized', color: '#64748b' },
+    { key: 'work', label: 'Work', color: TASK_LISTS.work.color },
+    { key: 'study', label: 'Study', color: TASK_LISTS.study.color },
+    { key: 'hustle', label: 'Hustle', color: TASK_LISTS.hustle.color },
+    { key: 'life', label: 'Life', color: TASK_LISTS.life.color },
+    // Uncategorized borrows the Inbox neutral rather than defining a sixth colour, and the
+    // two really are the same bucket: Inbox focus has no resolvable list name, so it lands
+    // in uncategorized on the way through the sync.
+    { key: 'uncategorized', label: 'Uncategorized', color: TASK_LISTS.inbox.color },
 ];
 
 /**
