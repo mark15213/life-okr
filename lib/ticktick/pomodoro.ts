@@ -11,8 +11,8 @@ import { isTaskListKey, type TaskListKey } from './lists';
  * Browser-safe on purpose: no `node:crypto`, so the panel can import it directly.
  */
 
-export const FOCUS_DURATION_OPTIONS = [15, 25, 45, 60] as const;
-export const DEFAULT_FOCUS_MINUTES = 25;
+export const FOCUS_DURATION_OPTIONS = [15, 25, 30, 45, 60] as const;
+export const DEFAULT_FOCUS_MINUTES = 30;
 
 /** Below this, a session is dropped rather than uploaded — seconds-long entries are noise. */
 export const MIN_LOGGED_FOCUS_SECONDS = 60;
