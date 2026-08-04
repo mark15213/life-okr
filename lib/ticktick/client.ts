@@ -9,10 +9,7 @@ import { isOpenTask, type RawTickTickTask } from './tasks';
 
 const API_BASE = 'https://api.ticktick.com/api/v2';
 
-/**
- * The unofficial API refuses requests without a device header. Same shape the CLI sync uses
- * (scripts/lib/ticktick-client.ts) — keep the two in step if TickTick ever bumps `version`.
- */
+/** The unofficial API refuses requests without a device header. */
 const X_DEVICE = JSON.stringify({
   platform: 'web',
   os: 'macOS',
@@ -132,6 +129,34 @@ export async function fetchSnapshot(cookie: string): Promise<TickTickSnapshot> {
     projectIdByListKey: buildProjectIdByListKey(profiles, inboxId),
     projectNameById,
   };
+}
+
+/**
+ * Every focus session the account will admit to, newest first. The endpoint caps how far
+ * back it reaches (roughly ten days on this account), which is why a past day reporting
+ * nothing is treated as unknown rather than as zero.
+ */
+export async function fetchPomodoroTimeline(cookie: string, toMs: number): Promise<unknown[]> {
+  const body = await request(cookie, `/pomodoros/timeline?to=${toMs}`);
+  return Array.isArray(body) ? body : [];
+}
+
+/**
+ * Completed tasks in a window, Inbox included — which is the whole reason this runs on the
+ * unofficial API. `from`/`to` are local wall-clock strings, not epoch ms; sending epoch ms
+ * returns HTTP 500. The limit is per request rather than per day.
+ */
+export async function fetchCompletedTasks(
+  cookie: string,
+  from: string,
+  to: string,
+  limit: number
+): Promise<unknown[]> {
+  const path =
+    `/project/all/completed/?from=${encodeURIComponent(from)}` +
+    `&to=${encodeURIComponent(to)}&limit=${limit}`;
+  const body = await request(cookie, path);
+  return Array.isArray(body) ? body : [];
 }
 
 export async function createTask(

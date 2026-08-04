@@ -10,7 +10,7 @@ import {
   type Category,
   type CategoryTotals,
   type TickTickPomodoro,
-} from './ticktick-aggregate';
+} from './aggregate';
 
 const range = {
   startMs: new Date(2026, 4, 24, 0, 0, 0).getTime(),

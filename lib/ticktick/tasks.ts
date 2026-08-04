@@ -1,7 +1,8 @@
 import type { TaskListKey } from './lists';
 import { TASK_GROUPS, type PanelTask, type TaskGroup } from './task-groups';
+import { APP_TZ } from '../app-tz';
 
-export const APP_TZ = process.env.APP_TZ ?? 'Asia/Shanghai';
+export { APP_TZ };
 
 export type { PanelTask, TaskGroup };
 

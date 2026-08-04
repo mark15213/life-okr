@@ -1,4 +1,4 @@
-import type { LocalDayRange } from './ticktick-date';
+import type { DayRange } from './day';
 
 export const CATEGORIES = ['work', 'study', 'hustle', 'life', 'uncategorized'] as const;
 export type Category = (typeof CATEGORIES)[number];
@@ -62,7 +62,7 @@ export interface TickTickPomodoro {
  * if a future change starts filtering on `status`/`type`/`adjustTime`, it cannot be
  * applied to one path and not the other, which would break the reconciliation invariant.
  */
-function sessionSecondsInRange(p: TickTickPomodoro, range: LocalDayRange): number | null {
+function sessionSecondsInRange(p: TickTickPomodoro, range: DayRange): number | null {
   const startMs = new Date(p.startTime).getTime();
   const endMs = new Date(p.endTime).getTime();
   if (Number.isNaN(startMs) || Number.isNaN(endMs)) return null;
@@ -147,7 +147,7 @@ function apportion(total: number, weights: CategoryTotals): CategoryTotals {
   return out;
 }
 
-export function countCompletedTasksToday(tasks: TickTickTask[], range: LocalDayRange): number {
+export function countCompletedTasksToday(tasks: TickTickTask[], range: DayRange): number {
   let count = 0;
   for (const t of tasks) {
     if (t.status !== 2) continue;
@@ -159,7 +159,7 @@ export function countCompletedTasksToday(tasks: TickTickTask[], range: LocalDayR
   return count;
 }
 
-export function sumFocusMinutesToday(pomodoros: TickTickPomodoro[], range: LocalDayRange): number {
+export function sumFocusMinutesToday(pomodoros: TickTickPomodoro[], range: DayRange): number {
   let totalSeconds = 0;
   for (const p of pomodoros) {
     const seconds = sessionSecondsInRange(p, range);
@@ -175,7 +175,7 @@ export function sumFocusMinutesToday(pomodoros: TickTickPomodoro[], range: Local
  */
 export function countCompletedTasksByCategory(
   tasks: TickTickTask[],
-  range: LocalDayRange,
+  range: DayRange,
   projectIdToCategory: Map<string, Category>
 ): CategorizedTotal {
   const byCategory = emptyCategoryTotals();
@@ -201,7 +201,7 @@ export function countCompletedTasksByCategory(
  */
 export function sumFocusMinutesByCategory(
   pomodoros: TickTickPomodoro[],
-  range: LocalDayRange
+  range: DayRange
 ): CategorizedTotal {
   const secondsByCategory = new Map<Category, number>();
   let totalSeconds = 0;

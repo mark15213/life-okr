@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     AlertTriangle,
@@ -98,6 +98,31 @@ function writeStored(key: string, value: unknown): void {
     }
 }
 
+const RESYNC_THROTTLE_KEY = 'life-okr-last-resync';
+const RESYNC_THROTTLE_MS = 5 * 60 * 1000;
+
+/**
+ * Pull the dashboard's stored totals back in line with TickTick.
+ *
+ * Safe to call as often as we like: the endpoint recomputes each day from TickTick and
+ * overwrites, so it converges rather than accumulating. Failures are deliberately quiet —
+ * whatever prompted the resync has already been written to TickTick, and the next trigger
+ * will pick it up; a toast here would only report that a number is briefly stale.
+ */
+async function resyncDashboard(): Promise<void> {
+    try {
+        const res = await fetch('/api/ticktick/sync', {
+            method: 'POST',
+            credentials: 'same-origin',
+        });
+        if (!res.ok) return;
+        // Everything the cards and charts read comes off /api/records*.
+        await globalMutate((key) => typeof key === 'string' && key.startsWith('/api/records'));
+    } catch {
+        // Offline, or the cookie expired. Nothing here is worth interrupting the user for.
+    }
+}
+
 function focusLabel(seconds: number): string {
     const minutes = Math.round(seconds / 60);
     if (minutes < 60) return `${minutes}m`;
@@ -133,6 +158,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
 
     const finishingRef = useRef<string | null>(null);
     const retriedRef = useRef(false);
+    const resyncedRef = useRef(false);
 
     const { data, error, isLoading, mutate } = useSWR(
         // Reads are gated too — the cookie is a whole-account credential, so an unauthenticated
@@ -201,6 +227,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                     tone: 'good',
                     message: `Logged ${focusLabel(record.focusSeconds)} of focus on “${record.title}”.`,
                 });
+                void resyncDashboard();
                 return;
             }
 
@@ -232,6 +259,21 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
         retriedRef.current = true;
         void upload(pending);
     }, [hydrated, isAuthed, pending, upload]);
+
+    useEffect(() => {
+        // Catch up on anything done elsewhere — a pomodoro run in TickTick's own app, a task
+        // ticked off on the phone — without needing the laptop that owns the cron to be awake.
+        // Throttled because opening the dashboard twice in a minute should not mean two full
+        // account fetches; the write itself is idempotent either way.
+        if (!hydrated || !isAuthed || resyncedRef.current) return;
+        resyncedRef.current = true;
+
+        const last = Number(localStorage.getItem(RESYNC_THROTTLE_KEY) ?? 0);
+        if (Number.isFinite(last) && Date.now() - last < RESYNC_THROTTLE_MS) return;
+
+        writeStored(RESYNC_THROTTLE_KEY, Date.now());
+        void resyncDashboard();
+    }, [hydrated, isAuthed]);
 
     /* ------------------------------------------------------------------- pomodoro */
 
@@ -342,6 +384,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                     (prev) => ({ tasks: (prev?.tasks ?? []).filter((t) => t.id !== task.id) }),
                     { revalidate: false }
                 );
+                void resyncDashboard();
                 return;
             }
 

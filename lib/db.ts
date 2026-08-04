@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import { APP_TZ } from './app-tz';
 
 const DEFAULT_DAYS = 7;
 
@@ -45,7 +46,6 @@ function normalizeRecord(row: Record<string, unknown>): DailyRecord {
 // onto yesterday's row whenever the user is east of UTC during their early
 // morning. Pin to APP_TZ (default Asia/Shanghai); en-CA locale renders as
 // YYYY-MM-DD, matching the daily_records.date column shape.
-const APP_TZ = process.env.APP_TZ ?? 'Asia/Shanghai';
 function todayInAppTz(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: APP_TZ });
 }
