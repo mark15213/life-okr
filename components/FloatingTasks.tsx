@@ -725,8 +725,20 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                 )}
                             </AnimatePresence>
 
-                            {/* Filters */}
-                            <div className="px-6 py-2.5 border-b border-zinc-100 flex gap-1.5 overflow-x-auto">
+                            {/* Filters.
+                                `shrink-0` is load-bearing, not tidiness. This row needs
+                                `overflow-x-auto` to scroll its pills on a narrow screen, and
+                                that quietly forces `overflow-y` to `auto` as well — which
+                                drops its automatic minimum height from "as tall as my
+                                content" to zero. It is then the only child of this column
+                                the flex algorithm is allowed to squash: the header and
+                                capture rows keep visible overflow, and the list has an
+                                explicit min-height. So the moment the dialog hit its 90vh
+                                cap — i.e. whenever the list was long, which is exactly the
+                                All filter — the entire shortfall landed here, collapsing 48px
+                                of row to 28px and slicing the pills in half against their own
+                                scroll box. */}
+                            <div className="px-6 py-2.5 border-b border-zinc-100 flex gap-1.5 overflow-x-auto shrink-0">
                                 {(['all', ...Object.keys(TASK_LISTS)] as Filter[]).map((key) => {
                                     const count =
                                         key === 'all' ? tasks.length : countByList.get(key as TaskListKey) ?? 0;
