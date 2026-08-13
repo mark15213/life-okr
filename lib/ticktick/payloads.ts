@@ -54,14 +54,31 @@ export function buildNewTaskPayload(input: NewTaskInput): Record<string, unknown
 }
 
 /**
- * Completion is a full-object update, not a patch: the batch endpoint replaces the stored
- * task with what you send, so the caller must hand over the task exactly as it was read.
+ * How a task stopped being open, and the `status` TickTick files it under.
+ *
+ * Both outcomes are "closed" tasks and both carry a `completedTime` — the status is the only
+ * thing that separates a win from a write-off. Keeping them apart matters beyond the label:
+ * `/project/all/completed/` returns abandoned tasks mixed in with real completions, and the
+ * dashboard's counts only survive that because they filter on `status === 2`. Writing a
+ * won't-do task as 2 would score it as work done.
+ *
+ * The keys double as the URL segment under `/api/ticktick/tasks/[id]/`, so there is one
+ * spelling of each outcome rather than a wire name and a code name to keep in step.
  */
-export function buildCompletePayload<T extends Record<string, unknown>>(
+export const CLOSED_STATUS = { complete: 2, 'wont-do': -1 } as const;
+
+export type TaskOutcome = keyof typeof CLOSED_STATUS;
+
+/**
+ * Closing is a full-object update, not a patch: the batch endpoint replaces the stored task
+ * with what you send, so the caller must hand over the task exactly as it was read.
+ */
+export function buildClosePayload<T extends Record<string, unknown>>(
   task: T,
-  completedAt: Date
+  outcome: TaskOutcome,
+  closedAt: Date
 ): Record<string, unknown> {
-  return { ...task, status: 2, completedTime: toTickTickTime(completedAt) };
+  return { ...task, status: CLOSED_STATUS[outcome], completedTime: toTickTickTime(closedAt) };
 }
 
 export interface FocusSessionInput {

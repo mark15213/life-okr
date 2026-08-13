@@ -5,6 +5,7 @@ import useSWR, { mutate as globalMutate } from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     AlertTriangle,
+    Ban,
     Check,
     ListChecks,
     Lock,
@@ -58,6 +59,12 @@ const PRIORITY_RINGS: Record<number, string> = {
 };
 
 const OVERDUE = '#e11d48';
+
+/**
+ * The two ways a task leaves the list, spelled the same here as in the route that performs
+ * them. Only `complete` counts as work done — see CLOSED_STATUS in lib/ticktick/payloads.ts.
+ */
+type TaskOutcome = 'complete' | 'wont-do';
 
 type Filter = 'all' | TaskListKey;
 type NoticeTone = 'error' | 'good' | 'muted';
@@ -152,7 +159,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
     const [title, setTitle] = useState('');
     const [captureList, setCaptureList] = useState<TaskListKey>('work');
     const [capturing, setCapturing] = useState(false);
-    const [completing, setCompleting] = useState<Set<string>>(new Set());
+    const [closing, setClosing] = useState<Map<string, TaskOutcome>>(new Map());
     const [filter, setFilter] = useState<Filter>('all');
     const [notice, setNotice] = useState<Notice | null>(null);
 
@@ -369,12 +376,12 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
         }
     };
 
-    const complete = async (task: PanelTask) => {
-        if (completing.has(task.id)) return;
-        setCompleting((prev) => new Set(prev).add(task.id));
+    const close = async (task: PanelTask, outcome: TaskOutcome) => {
+        if (closing.has(task.id)) return;
+        setClosing((prev) => new Map(prev).set(task.id, outcome));
 
         try {
-            const res = await fetch(`/api/ticktick/tasks/${task.id}/complete`, {
+            const res = await fetch(`/api/ticktick/tasks/${task.id}/${outcome}`, {
                 method: 'POST',
                 credentials: 'same-origin',
             });
@@ -384,17 +391,30 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                     (prev) => ({ tasks: (prev?.tasks ?? []).filter((t) => t.id !== task.id) }),
                     { revalidate: false }
                 );
-                void resyncDashboard();
+                if (outcome === 'complete') {
+                    void resyncDashboard();
+                } else {
+                    // No resync: abandoning cannot move a stored total. The counts only ever
+                    // include status 2, and the panel can only abandon a task that was still
+                    // open — so a full account re-fetch would buy nothing. A word instead,
+                    // because a row vanishing looks identical either way and this is the
+                    // outcome that should not be mistaken for having finished something.
+                    setNotice({ tone: 'muted', message: `“${task.title}” is marked won’t do.` });
+                }
                 return;
             }
 
             const body = await res.json().catch(() => ({}));
-            setNotice({ tone: 'error', message: body.error || 'Could not complete that task.' });
+            const fallback =
+                outcome === 'complete'
+                    ? 'Could not complete that task.'
+                    : 'Could not mark that task won’t do.';
+            setNotice({ tone: 'error', message: body.error || fallback });
         } catch {
-            setNotice({ tone: 'error', message: 'Could not reach the server to complete that task.' });
+            setNotice({ tone: 'error', message: 'Could not reach the server to update that task.' });
         } finally {
-            setCompleting((prev) => {
-                const next = new Set(prev);
+            setClosing((prev) => {
+                const next = new Map(prev);
                 next.delete(task.id);
                 return next;
             });
@@ -766,7 +786,8 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                             </div>
 
                                             {items.map((task) => {
-                                                const isCompleting = completing.has(task.id);
+                                                const outcome = closing.get(task.id);
+                                                const isClosing = outcome !== undefined;
                                                 const isFocused = session?.taskId === task.id;
                                                 return (
                                                     <div
@@ -776,29 +797,36 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                                             isFocused ? 'bg-zinc-50' : 'hover:bg-zinc-50/60'
                                                         )}
                                                     >
+                                                        {/* The ring doubles as the in-flight indicator, and which glyph
+                                                            lands in it is the only thing distinguishing the two ways a
+                                                            row can be leaving: filled dark with a tick for done, muted
+                                                            with a cross for written off. */}
                                                         <button
-                                                            onClick={() => void complete(task)}
-                                                            disabled={isCompleting}
+                                                            onClick={() => void close(task, 'complete')}
+                                                            disabled={isClosing}
                                                             aria-label={`Complete ${task.title}`}
                                                             className={cn(
                                                                 'w-[19px] h-[19px] shrink-0 rounded-full border-2 flex items-center justify-center transition-colors',
-                                                                isCompleting
+                                                                outcome === 'complete'
                                                                     ? 'bg-zinc-900 border-zinc-900 text-white'
-                                                                    : 'hover:bg-zinc-100'
+                                                                    : outcome === 'wont-do'
+                                                                      ? 'bg-zinc-300 border-zinc-300 text-white'
+                                                                      : 'hover:bg-zinc-100'
                                                             )}
                                                             style={
-                                                                isCompleting
+                                                                isClosing
                                                                     ? undefined
                                                                     : { borderColor: PRIORITY_RINGS[task.priority] ?? PRIORITY_RINGS[0] }
                                                             }
                                                         >
-                                                            {isCompleting && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
+                                                            {outcome === 'complete' && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
+                                                            {outcome === 'wont-do' && <X className="w-2.5 h-2.5" strokeWidth={4} />}
                                                         </button>
 
                                                         <span
                                                             className={cn(
                                                                 'flex-1 min-w-0 text-[13.5px] font-medium truncate',
-                                                                isCompleting
+                                                                isClosing
                                                                     ? 'text-zinc-400 line-through'
                                                                     : 'text-zinc-800'
                                                             )}
@@ -835,6 +863,22 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                                             )}
                                                         >
                                                             <Play className="w-2.5 h-2.5 fill-current" />
+                                                        </button>
+
+                                                        {/* Furthest from the tick on purpose. Both buttons close the
+                                                            row, and they are the one pair here where hitting the wrong
+                                                            one writes the wrong history — so they sit at opposite ends
+                                                            with the whole row between them. Zinc, not rose: rose means
+                                                            overdue everywhere else in this panel, and deciding not to
+                                                            do something is a decision, not an alarm. */}
+                                                        <button
+                                                            onClick={() => void close(task, 'wont-do')}
+                                                            disabled={isClosing}
+                                                            aria-label={`Mark ${task.title} as won’t do`}
+                                                            title="Won’t do"
+                                                            className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-all text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-40 sm:opacity-0 sm:group-hover/row:opacity-100 focus-visible:opacity-100"
+                                                        >
+                                                            <Ban className="w-3 h-3" />
                                                         </button>
                                                     </div>
                                                 );

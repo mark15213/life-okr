@@ -4,7 +4,7 @@ import {
   type ProjectProfile,
   type TaskListKey,
 } from './lists';
-import { buildCompletePayload } from './payloads';
+import { buildClosePayload, type TaskOutcome } from './payloads';
 import { isOpenTask, type RawTickTickTask } from './tasks';
 
 const API_BASE = 'https://api.ticktick.com/api/v2';
@@ -170,13 +170,16 @@ export async function createTask(
 }
 
 /**
- * Mark a task done. The batch endpoint replaces rather than patches, so the task is read back
- * first — sending a hand-built stub would blank out its content, tags and reminders.
+ * Close a task — done, or won't do. The batch endpoint replaces rather than patches, so the
+ * task is read back first: sending a hand-built stub would blank out its content, tags and
+ * reminders. Reading it back is also what makes `TaskNotFoundError` meaningful — a task that
+ * is no longer open cannot be closed twice.
  */
-export async function completeTask(
+export async function closeTask(
   cookie: string,
   taskId: string,
-  completedAt: Date
+  outcome: TaskOutcome,
+  closedAt: Date
 ): Promise<RawTickTickTask> {
   const snapshot = await fetchSnapshot(cookie);
   const task = snapshot.openTasks.find((t) => t.id === taskId);
@@ -186,7 +189,7 @@ export async function completeTask(
     method: 'POST',
     body: JSON.stringify({
       add: [],
-      update: [buildCompletePayload(task, completedAt)],
+      update: [buildClosePayload(task, outcome, closedAt)],
       delete: [],
       addAttachments: [],
     }),

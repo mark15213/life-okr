@@ -43,6 +43,24 @@ test('counts only status=2 tasks completed within today range', () => {
   assert.equal(countCompletedTasksToday(tasks, range), 2);
 });
 
+test("won't-do tasks never count as work done, in the total or in any category", () => {
+  // Not hypothetical: /project/all/completed/ hands abandoned tasks (status -1) back mixed
+  // in with real completions, timestamped exactly like them. The status filter is the only
+  // thing keeping them out, and the panel now creates them by the click.
+  const tasks = [
+    { status: 2, completedTime: new Date(2026, 4, 24, 10, 0, 0).toISOString(), projectId: 'p-work' },
+    { status: -1, completedTime: new Date(2026, 4, 24, 11, 0, 0).toISOString(), projectId: 'p-work' },
+    { status: -1, completedTime: new Date(2026, 4, 24, 12, 0, 0).toISOString(), projectId: 'p-study' },
+  ];
+
+  assert.equal(countCompletedTasksToday(tasks, range), 1);
+
+  const split = countCompletedTasksByCategory(tasks, range, PROJECTS);
+  assert.equal(split.total, 1);
+  assert.equal(split.byCategory.work, 1);
+  assert.equal(split.byCategory.study, 0);
+});
+
 test('returns 0 on empty list', () => {
   assert.equal(countCompletedTasksToday([], range), 0);
 });

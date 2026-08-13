@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-  buildCompletePayload,
+  buildClosePayload,
   buildFocusSessionPayload,
   buildNewTaskPayload,
   newObjectId,
@@ -56,7 +56,7 @@ test('a captured task is due at a concrete moment, not all day', () => {
   assert.equal(payload.timeZone, 'Asia/Shanghai');
 });
 
-test('completing a task preserves every field it was read with', () => {
+test('closing a task preserves every field it was read with', () => {
   // The batch endpoint replaces rather than patches: anything dropped here is erased
   // from the user's task.
   const stored = {
@@ -70,7 +70,7 @@ test('completing a task preserves every field it was read with', () => {
     reminders: [{ id: 'r1' }],
   };
 
-  const payload = buildCompletePayload(stored, new Date('2026-08-03T04:00:00.000Z'));
+  const payload = buildClosePayload(stored, 'complete', new Date('2026-08-03T04:00:00.000Z'));
 
   assert.equal(payload.content, 'call the agent first');
   assert.deepEqual(payload.tags, ['home']);
@@ -79,15 +79,36 @@ test('completing a task preserves every field it was read with', () => {
 });
 
 test('completing a task marks it done and stamps when', () => {
-  const payload = buildCompletePayload({ id: 'a1', status: 0 }, new Date('2026-08-03T04:00:00.000Z'));
+  const payload = buildClosePayload(
+    { id: 'a1', status: 0 },
+    'complete',
+    new Date('2026-08-03T04:00:00.000Z')
+  );
 
   assert.equal(payload.status, 2);
   assert.equal(payload.completedTime, '2026-08-03T04:00:00.000+0000');
 });
 
-test('completing a task leaves the object it was given alone', () => {
+test("a won't-do task is closed as abandoned, never as done", () => {
+  // -1 is TickTick's "Abandoned". It matters that this is not 2: the completed-tasks
+  // endpoint hands abandoned tasks back mixed in with real completions, and the dashboard
+  // only keeps them out of its counts by filtering on status === 2. Writing 2 here would
+  // score every abandoned task as work done.
+  const payload = buildClosePayload(
+    { id: 'a1', status: 0 },
+    'wont-do',
+    new Date('2026-08-03T04:00:00.000Z')
+  );
+
+  assert.equal(payload.status, -1);
+  // Abandoned tasks carry a completedTime too — it is the closing stamp, not a claim of
+  // achievement, and TickTick's own clients set it.
+  assert.equal(payload.completedTime, '2026-08-03T04:00:00.000+0000');
+});
+
+test('closing a task leaves the object it was given alone', () => {
   const stored = { id: 'a1', status: 0 };
-  buildCompletePayload(stored, new Date());
+  buildClosePayload(stored, 'wont-do', new Date());
   assert.equal(stored.status, 0);
 });
 
