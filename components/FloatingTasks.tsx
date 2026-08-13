@@ -7,6 +7,7 @@ import {
     AlertTriangle,
     Ban,
     Check,
+    ChevronDown,
     ListChecks,
     Lock,
     Pause,
@@ -158,6 +159,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
 
     const [title, setTitle] = useState('');
     const [captureList, setCaptureList] = useState<TaskListKey>('work');
+    const [listOpen, setListOpen] = useState(false);
     const [capturing, setCapturing] = useState(false);
     const [closing, setClosing] = useState<Map<string, TaskOutcome>>(new Map());
     const [filter, setFilter] = useState<Filter>('all');
@@ -453,11 +455,19 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') setIsOpen(false);
+            if (e.key !== 'Escape') return;
+            // Innermost first. Escaping out of a list picker should not also throw away the
+            // half-typed task behind it.
+            if (listOpen || durationOpen) {
+                setListOpen(false);
+                setDurationOpen(false);
+                return;
+            }
+            setIsOpen(false);
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen]);
+    }, [isOpen, listOpen, durationOpen]);
 
     const openPanel = () => {
         if (!isAuthed) {
@@ -578,8 +588,18 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                             </div>
 
                             {/* Capture. The row wraps on narrow screens rather than squeezing the
-                                field down to a few characters beside the two buttons. */}
-                            <div className="px-6 py-4 border-b border-zinc-100 flex flex-col gap-2.5">
+                                field down to a few characters beside the two buttons.
+
+                                The destination list is part of the field rather than a row of
+                                its own. It used to be four pills sitting directly above the
+                                filter pills — same size, same shape, same black fill for
+                                "selected" — and the two rows mean opposite things. The failure
+                                is silent and only runs one way: clicking a filter when you
+                                meant the destination changes nothing you can see, and the task
+                                then lands in whichever list was picked last. So the
+                                destination is now the one control here wearing a colour, and
+                                it sits between the cursor and the buttons that submit. */}
+                            <div className="px-6 py-4 border-b border-zinc-100 flex flex-col gap-2 shrink-0">
                                 <form
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -587,12 +607,89 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                     }}
                                     className="flex flex-wrap gap-2"
                                 >
-                                    <input
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        placeholder="What needs doing?"
-                                        className="w-full sm:w-auto sm:flex-1 min-w-0 h-11 px-4 bg-zinc-50 border border-zinc-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-400 focus:bg-white transition-all"
-                                    />
+                                    <div className="w-full sm:w-auto sm:flex-1 min-w-0 h-11 flex items-center pl-1.5 bg-zinc-50 border border-zinc-200 rounded-2xl focus-within:ring-2 focus-within:ring-zinc-900/10 focus-within:border-zinc-400 focus-within:bg-white transition-all">
+                                        <div className="relative shrink-0 flex items-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => setListOpen((v) => !v)}
+                                                aria-haspopup="listbox"
+                                                aria-expanded={listOpen}
+                                                aria-label={`New tasks go to ${TASK_LISTS[captureList].label} — change list`}
+                                                // The tint carries the list identity; the label stays
+                                                // near-black. Filling the chip with the colour itself
+                                                // would put white text on cyan and amber at roughly 3:1,
+                                                // which is a coin toss to read at 13px.
+                                                style={{ backgroundColor: `${TASK_LISTS[captureList].color}1f` }}
+                                                className="h-8 pl-2.5 pr-2 rounded-xl flex items-center gap-1.5 text-[13px] font-semibold text-zinc-900 hover:brightness-95 transition-all"
+                                            >
+                                                <span
+                                                    className="w-2 h-2 rounded-full shrink-0"
+                                                    style={{ backgroundColor: TASK_LISTS[captureList].color }}
+                                                />
+                                                {TASK_LISTS[captureList].label}
+                                                <ChevronDown className="w-3 h-3 text-zinc-400" />
+                                            </button>
+
+                                            {listOpen && (
+                                                <>
+                                                    <div
+                                                        className="fixed inset-0 z-10"
+                                                        onClick={() => setListOpen(false)}
+                                                    />
+                                                    {/* Downward, unlike the duration popup: this sits at
+                                                        the top of the dialog, and upward would open into
+                                                        the header and get cut by the rounded clip. */}
+                                                    <div
+                                                        role="listbox"
+                                                        className="absolute z-20 top-full left-0 mt-2 w-44 p-1 bg-white rounded-2xl border border-zinc-200 shadow-xl"
+                                                    >
+                                                        {CAPTURE_LIST_KEYS.map((key) => (
+                                                            <button
+                                                                key={key}
+                                                                type="button"
+                                                                role="option"
+                                                                aria-selected={key === captureList}
+                                                                onClick={() => {
+                                                                    setCaptureList(key);
+                                                                    setListOpen(false);
+                                                                }}
+                                                                style={
+                                                                    key === captureList
+                                                                        ? { backgroundColor: `${TASK_LISTS[key].color}1f` }
+                                                                        : undefined
+                                                                }
+                                                                className={cn(
+                                                                    'w-full h-9 px-2.5 rounded-xl flex items-center gap-2 text-[13px] font-semibold transition-colors',
+                                                                    key === captureList
+                                                                        ? 'text-zinc-900'
+                                                                        : 'text-zinc-500 hover:bg-zinc-50'
+                                                                )}
+                                                            >
+                                                                <span
+                                                                    className="w-2 h-2 rounded-full shrink-0"
+                                                                    style={{ backgroundColor: TASK_LISTS[key].color }}
+                                                                />
+                                                                {TASK_LISTS[key].label}
+                                                                {key === captureList && (
+                                                                    <Check
+                                                                        className="w-3.5 h-3.5 ml-auto text-zinc-400"
+                                                                        strokeWidth={3}
+                                                                    />
+                                                                )}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <input
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                            placeholder="What needs doing?"
+                                            className="flex-1 min-w-0 h-full px-2.5 bg-transparent text-sm focus:outline-none placeholder:text-zinc-400"
+                                        />
+                                    </div>
                                     <button
                                         type="submit"
                                         disabled={!title.trim() || capturing}
@@ -653,32 +750,9 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                     </div>
                                 </form>
 
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                    {CAPTURE_LIST_KEYS.map((key) => (
-                                        <button
-                                            key={key}
-                                            onClick={() => setCaptureList(key)}
-                                            className={cn(
-                                                'h-8 px-3 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors',
-                                                key === captureList
-                                                    ? 'bg-zinc-900 border-zinc-900 text-white'
-                                                    : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300'
-                                            )}
-                                        >
-                                            <span
-                                                className="w-1.5 h-1.5 rounded-full"
-                                                style={{
-                                                    backgroundColor:
-                                                        key === captureList ? '#ffffff' : TASK_LISTS[key].color,
-                                                }}
-                                            />
-                                            {TASK_LISTS[key].label}
-                                        </button>
-                                    ))}
-                                    <span className="ml-auto text-[11px] text-zinc-400">
-                                        Top priority · due now
-                                    </span>
-                                </div>
+                                <span className="pl-1 text-[11px] text-zinc-400">
+                                    Top priority · due now
+                                </span>
                             </div>
 
                             {/* Notices */}
@@ -725,9 +799,13 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                 )}
                             </AnimatePresence>
 
-                            {/* Filters.
+                            {/* Filters. Underlined text rather than pills, so this row cannot be
+                                mistaken for the destination chip above it: that one is a filled,
+                                coloured control that changes where a new task goes, these only
+                                change what you are looking at.
+
                                 `shrink-0` is load-bearing, not tidiness. This row needs
-                                `overflow-x-auto` to scroll its pills on a narrow screen, and
+                                `overflow-x-auto` to scroll its tabs on a narrow screen, and
                                 that quietly forces `overflow-y` to `auto` as well — which
                                 drops its automatic minimum height from "as tall as my
                                 content" to zero. It is then the only child of this column
@@ -738,19 +816,18 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                 All filter — the entire shortfall landed here, collapsing 48px
                                 of row to 28px and slicing the pills in half against their own
                                 scroll box. */}
-                            <div className="px-6 py-2.5 border-b border-zinc-100 flex gap-1.5 overflow-x-auto shrink-0">
+                            <div className="px-6 border-b border-zinc-100 flex gap-4 overflow-x-auto shrink-0">
                                 {(['all', ...Object.keys(TASK_LISTS)] as Filter[]).map((key) => {
                                     const count =
                                         key === 'all' ? tasks.length : countByList.get(key as TaskListKey) ?? 0;
+                                    const active = key === filter;
                                     return (
                                         <button
                                             key={key}
                                             onClick={() => setFilter(key)}
                                             className={cn(
-                                                'h-7 px-3 rounded-full text-xs font-semibold flex items-center gap-1.5 shrink-0 border transition-colors',
-                                                key === filter
-                                                    ? 'bg-zinc-900 border-zinc-900 text-white'
-                                                    : 'bg-zinc-50 border-zinc-100 text-zinc-500 hover:border-zinc-200'
+                                                'relative h-10 flex items-center gap-1.5 shrink-0 text-xs font-semibold transition-colors',
+                                                active ? 'text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'
                                             )}
                                         >
                                             {key !== 'all' && <ListDot list={key as TaskListKey} />}
@@ -758,11 +835,16 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                             <span
                                                 className={cn(
                                                     'tabular-nums font-bold text-[11px]',
-                                                    key === filter ? 'text-zinc-300' : 'text-zinc-400'
+                                                    active ? 'text-zinc-400' : 'text-zinc-300'
                                                 )}
                                             >
                                                 {count}
                                             </span>
+                                            {active && (
+                                                // bottom-0, not -bottom-px: the row is its own scroll
+                                                // box, so anything outside the padding box is clipped.
+                                                <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-zinc-900" />
+                                            )}
                                         </button>
                                     );
                                 })}
