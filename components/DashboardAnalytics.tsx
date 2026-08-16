@@ -6,14 +6,13 @@ import {
     CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 import {
-    format, startOfWeek, endOfWeek, subWeeks, subDays,
-    isWithinInterval, parseISO, isSameWeek
+    format, startOfWeek, endOfWeek, subWeeks, parseISO, isSameWeek
 } from 'date-fns';
 import { DailyRecord } from '@/lib/db';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
     TrendingUp, TrendingDown, Minus, Timer,
-    CheckCircle2, Dumbbell, ChevronDown, ChevronUp,
+    CheckCircle2, Dumbbell, Trophy,
     Table2, BarChart3, CalendarDays, Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -241,38 +240,52 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
     const { weeklyKPIs, weeklyTrendData } = useMemo(() => {
         if (!records || records.length === 0) return { weeklyKPIs: [], weeklyTrendData: [] };
 
-        const sorted = [...records].sort((a, b) =>
-            new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Aggregate one week of records
-        const aggregateWeek = (weekStart: Date, weekEnd: Date) => {
-            const recs = sorted.filter(r => {
-                const rd = parseISO(r.date);
-                return isWithinInterval(rd, { start: weekStart, end: weekEnd });
-            });
-            const result: Record<string, number> = { count: recs.length };
-            for (const key of METRIC_KEYS) {
-                result[key] = recs.reduce((s, r) => s + METRICS_CONFIG[key].extractValue(r), 0);
-            }
-            return result;
-        };
+        const emptyWeek = () =>
+            Object.fromEntries(METRIC_KEYS.map(k => [k, 0])) as Record<MetricKey, number>;
+
+        // Every record folded into its week in one pass, keyed by that week's Sunday. The old
+        // per-week interval filter re-walked the whole year for each week it rendered, which
+        // the all-history record scan below would have multiplied out to 52 sweeps.
+        const byWeek = new Map<string, Record<MetricKey, number>>();
+        for (const r of records) {
+            const weekKey = format(startOfWeek(parseISO(r.date), { weekStartsOn: 0 }), 'yyyy-MM-dd');
+            const acc = byWeek.get(weekKey) ?? emptyWeek();
+            for (const key of METRIC_KEYS) acc[key] += METRICS_CONFIG[key].extractValue(r);
+            byWeek.set(weekKey, acc);
+        }
+
+        const weekKeyOf = (d: Date) => format(startOfWeek(d, { weekStartsOn: 0 }), 'yyyy-MM-dd');
 
         // This week & last week for KPI cards
-        const thisWeekStart = startOfWeek(today, { weekStartsOn: 0 });
-        const thisWeekEnd = endOfWeek(today, { weekStartsOn: 0 });
-        const lastWeekStart = startOfWeek(subWeeks(today, 1), { weekStartsOn: 0 });
-        const lastWeekEnd = endOfWeek(subWeeks(today, 1), { weekStartsOn: 0 });
+        const thisWeekKey = weekKeyOf(today);
+        const thisWeek = byWeek.get(thisWeekKey) ?? emptyWeek();
+        const lastWeek = byWeek.get(weekKeyOf(subWeeks(today, 1))) ?? emptyWeek();
 
-        const thisWeek = aggregateWeek(thisWeekStart, thisWeekEnd);
-        const lastWeek = aggregateWeek(lastWeekStart, lastWeekEnd);
+        // Record week per metric, over every *finished* week in the fetch window (365 days, so
+        // effectively the last 52). The running week is left out on purpose: included, it would
+        // be measured against itself and sit at 100% of its own max all week, and the number is
+        // only interesting while there is still something to beat.
+        const best = Object.fromEntries(
+            METRIC_KEYS.map(k => [k, { value: 0, weekStart: null as string | null }])
+        ) as Record<MetricKey, { value: number; weekStart: string | null }>;
+        for (const [weekKey, agg] of byWeek) {
+            // yyyy-MM-dd sorts lexicographically, so this also drops any stray future week.
+            if (weekKey >= thisWeekKey) continue;
+            for (const key of METRIC_KEYS) {
+                if (agg[key] > best[key].value) best[key] = { value: agg[key], weekStart: weekKey };
+            }
+        }
 
         const weeklyKPIs = METRIC_KEYS.map(key => {
             const config = METRICS_CONFIG[key];
             const current = thisWeek[key];
             const previous = lastWeek[key];
+            const peak = best[key];
+            const peakStart = peak.weekStart ? parseISO(peak.weekStart) : null;
+            const delta = current - peak.value;
             return {
                 key,
                 label: config.label,
@@ -281,6 +294,18 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                 currentValue: config.formatValue(current),
                 previousValue: config.formatValue(previous),
                 change: pctChange(current, previous),
+                bestValue: config.formatValue(peak.value),
+                // null when no earlier week carries this metric at all — there is no benchmark
+                // to compare against, which the card says rather than printing a hollow 0.
+                bestLabel: peakStart ? `W${format(peakStart, 'ww')}` : null,
+                bestRange: peakStart
+                    ? `${format(peakStart, 'MMM d')} – ${format(endOfWeek(peakStart, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
+                    : null,
+                pctOfBest: peak.value > 0 ? Math.round((current / peak.value) * 100) : 0,
+                isRecord: peakStart !== null && delta > 0,
+                deltaLabel: delta === 0
+                    ? 'matched'
+                    : `${delta > 0 ? '+' : '-'}${config.formatValue(Math.abs(delta))}`,
             };
         });
 
@@ -289,7 +314,7 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
         for (let i = 11; i >= 0; i--) {
             const ws = startOfWeek(subWeeks(today, i), { weekStartsOn: 0 });
             const we = endOfWeek(subWeeks(today, i), { weekStartsOn: 0 });
-            const agg = aggregateWeek(ws, we);
+            const agg = byWeek.get(format(ws, 'yyyy-MM-dd')) ?? emptyWeek();
 
             // Compute week number
             const weekNum = format(ws, 'ww');
@@ -326,7 +351,9 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                     <CalendarDays className="w-4 h-4" />
                     Weekly Pulse
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* One card per metric — four of them, so the track goes 2-up before 4-up rather
+                    than leaving a lone orphan card under a row of three. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {weeklyKPIs.map((kpi, i) => {
                         const Icon = kpi.icon;
                         return (
@@ -335,7 +362,7 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                                 initial={{ opacity: 0, y: 15 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: i * 0.07 }}
-                                className="group relative p-6 rounded-2xl bg-white/80 backdrop-blur-md border border-zinc-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] overflow-hidden"
+                                className="group relative flex flex-col p-6 rounded-2xl bg-white/80 backdrop-blur-md border border-zinc-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.03)] overflow-hidden"
                             >
                                 {/* Subtle accent bar at top */}
                                 <div
@@ -349,9 +376,64 @@ export default function DashboardAnalytics({ records }: DashboardAnalyticsProps)
                                 <div className="text-3xl font-bold text-zinc-900 mb-2 tracking-tight">
                                     {kpi.currentValue}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2">
                                     <span className="text-xs text-zinc-400">vs last week {kpi.previousValue}</span>
                                     <ChangeIndicator change={kpi.change} />
+                                </div>
+
+                                {/* Record week + where this week stands against it. `mt-auto` pins
+                                    it to the bottom so the meters line up across the row even when
+                                    the line above wraps on one card and not its neighbour. */}
+                                <div className="mt-auto pt-4">
+                                    <div className="border-t border-zinc-100 pt-3">
+                                        {kpi.bestLabel ? (
+                                            <>
+                                                <div
+                                                    className="flex items-baseline justify-between gap-2"
+                                                    title={`Best week in the last 52 weeks: ${kpi.bestRange}`}
+                                                >
+                                                    <span className="text-xs text-zinc-400 truncate">
+                                                        Max · {kpi.bestLabel}
+                                                    </span>
+                                                    <span className="text-xs font-semibold text-zinc-600 shrink-0">
+                                                        {kpi.bestValue}
+                                                    </span>
+                                                </div>
+                                                {/* Fill reads as "how much of the record this week has
+                                                    reclaimed"; capped at 100 so a record-breaking week
+                                                    doesn't run past the end of the track. */}
+                                                <div className="mt-2 h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+                                                    <div
+                                                        className="h-full rounded-full transition-[width] duration-700"
+                                                        style={{
+                                                            width: `${Math.min(100, kpi.pctOfBest)}%`,
+                                                            background: `linear-gradient(90deg, ${kpi.color}, ${kpi.color}99)`,
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="mt-2 flex items-center justify-between gap-2">
+                                                    {kpi.isRecord ? (
+                                                        <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
+                                                            <Trophy className="w-3 h-3 shrink-0" />
+                                                            New max
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-zinc-400">
+                                                            {kpi.pctOfBest}% of max
+                                                        </span>
+                                                    )}
+                                                    <span className={cn(
+                                                        "text-xs font-medium shrink-0",
+                                                        kpi.isRecord ? "text-emerald-600" : "text-zinc-400"
+                                                    )}>
+                                                        {kpi.deltaLabel}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <p className="text-xs text-zinc-300">No earlier week to beat</p>
+                                        )}
+                                    </div>
                                 </div>
                             </motion.div>
                         );

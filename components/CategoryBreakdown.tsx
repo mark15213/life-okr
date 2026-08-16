@@ -5,9 +5,9 @@ import useSWR from 'swr';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { format, startOfWeek, endOfWeek, subWeeks, isWithinInterval, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, subWeeks, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Layers, Timer, CheckCircle2 } from 'lucide-react';
+import { Layers, Timer, CheckCircle2, Trophy } from 'lucide-react';
 import type { DailyRecord, CategoryStatRow, CategoryKey } from '@/lib/db';
 import { TASK_LISTS } from '@/lib/ticktick/lists';
 import { cn } from '@/lib/utils';
@@ -154,22 +154,26 @@ export default function CategoryBreakdown({ records }: CategoryBreakdownProps) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const aggregate = (start: Date, end: Date) => {
-            const acc: Record<CategoryKey, number> = {
-                work: 0, study: 0, hustle: 0, life: 0, uncategorized: 0,
-            };
-            for (const d of perDate) {
-                if (!isWithinInterval(parseISO(d.date), { start, end })) continue;
-                for (const { key } of CATEGORY_META) acc[key] += d[key];
-            }
-            return acc;
-        };
+        const emptyWeek = (): Record<CategoryKey, number> => ({
+            work: 0, study: 0, hustle: 0, life: 0, uncategorized: 0,
+        });
+
+        // Roll each resolved day into its week once, keyed by that week's Sunday. The old
+        // per-week interval filter re-walked every day for every week rendered, which the
+        // all-history best-week scan below would have turned into a 52 × days sweep.
+        const byWeek = new Map<string, Record<CategoryKey, number>>();
+        for (const d of perDate) {
+            const weekKey = format(startOfWeek(parseISO(d.date), { weekStartsOn: 0 }), 'yyyy-MM-dd');
+            const acc = byWeek.get(weekKey) ?? emptyWeek();
+            for (const { key } of CATEGORY_META) acc[key] += d[key];
+            byWeek.set(weekKey, acc);
+        }
 
         const weeklyData = [];
         for (let i = 11; i >= 0; i--) {
             const ws = startOfWeek(subWeeks(today, i), { weekStartsOn: 0 });
             const we = endOfWeek(subWeeks(today, i), { weekStartsOn: 0 });
-            const agg = aggregate(ws, we);
+            const agg = byWeek.get(format(ws, 'yyyy-MM-dd')) ?? emptyWeek();
             weeklyData.push({
                 label: `W${format(ws, 'ww')}`,
                 fullLabel: `${format(ws, 'MMM d')} – ${format(we, 'MMM d')}`,
@@ -177,16 +181,44 @@ export default function CategoryBreakdown({ records }: CategoryBreakdownProps) {
             });
         }
 
-        const current = aggregate(
-            startOfWeek(today, { weekStartsOn: 0 }),
-            endOfWeek(today, { weekStartsOn: 0 })
-        );
+        const thisWeekKey = format(startOfWeek(today, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+        const current = byWeek.get(thisWeekKey) ?? emptyWeek();
+
+        // Per-category record week, over every *finished* week in the fetch window (365 days,
+        // so effectively the last 52). The running week is excluded on purpose: included, it
+        // would be compared against itself and sit at 100% of its own max forever, and the
+        // point of the number is having something left to beat.
+        const best = Object.fromEntries(
+            CATEGORY_META.map((c) => [c.key, { value: 0, weekStart: null as string | null }])
+        ) as Record<CategoryKey, { value: number; weekStart: string | null }>;
+        for (const [weekKey, agg] of byWeek) {
+            // yyyy-MM-dd sorts lexicographically, so this also drops any stray future week.
+            if (weekKey >= thisWeekKey) continue;
+            for (const { key } of CATEGORY_META) {
+                if (agg[key] > best[key].value) best[key] = { value: agg[key], weekStart: weekKey };
+            }
+        }
+
         const weekTotal = CATEGORY_META.reduce((s, c) => s + current[c.key], 0);
-        const thisWeekShare = CATEGORY_META.map((c) => ({
-            ...c,
-            value: current[c.key],
-            pct: weekTotal > 0 ? Math.round((current[c.key] / weekTotal) * 100) : 0,
-        }));
+        const thisWeekShare = CATEGORY_META.map((c) => {
+            const value = current[c.key];
+            const peak = best[c.key];
+            const peakStart = peak.weekStart ? parseISO(peak.weekStart) : null;
+            return {
+                ...c,
+                value,
+                pct: weekTotal > 0 ? Math.round((value / weekTotal) * 100) : 0,
+                best: peak.value,
+                // null when no earlier week ever put anything in this category — there is no
+                // benchmark to compare against, which the card says rather than printing 0.
+                bestLabel: peakStart ? `W${format(peakStart, 'ww')}` : null,
+                bestRange: peakStart
+                    ? `${format(peakStart, 'MMM d')} – ${format(endOfWeek(peakStart, { weekStartsOn: 0 }), 'MMM d, yyyy')}`
+                    : null,
+                pctOfBest: peak.value > 0 ? Math.round((value / peak.value) * 100) : 0,
+                delta: value - peak.value,
+            };
+        });
 
         return { weeklyData, thisWeekShare, weekTotal };
     }, [records, data, metric]);
@@ -239,6 +271,58 @@ export default function CategoryBreakdown({ records }: CategoryBreakdownProps) {
                             </div>
                             <div className="text-lg font-bold text-zinc-900 tracking-tight">{fmt(c.value)}</div>
                             <div className="text-xs text-zinc-400">{c.pct}% this week</div>
+
+                            {/* Record week + where this week stands against it */}
+                            <div className="mt-2.5 pt-2.5 border-t border-zinc-200/70">
+                                {c.bestLabel ? (
+                                    <>
+                                        <div
+                                            className="flex items-baseline justify-between gap-1.5"
+                                            title={`Best week in the last 52 weeks: ${c.bestRange}`}
+                                        >
+                                            <span className="text-[11px] text-zinc-400 truncate">
+                                                Max · {c.bestLabel}
+                                            </span>
+                                            <span className="text-[11px] font-semibold text-zinc-600 shrink-0">
+                                                {fmt(c.best)}
+                                            </span>
+                                        </div>
+                                        {/* Fill reads as "how much of the record this week has reclaimed";
+                                            capped at 100 so a record-breaking week doesn't overflow the track. */}
+                                        <div className="mt-1.5 h-1 rounded-full bg-zinc-200/70 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-[width] duration-500"
+                                                style={{
+                                                    width: `${Math.min(100, c.pctOfBest)}%`,
+                                                    backgroundColor: c.color,
+                                                }}
+                                            />
+                                        </div>
+                                        <div className="mt-1.5 flex items-center justify-between gap-1.5">
+                                            {c.delta > 0 ? (
+                                                <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                                                    <Trophy className="w-2.5 h-2.5 shrink-0" />
+                                                    New max
+                                                </span>
+                                            ) : (
+                                                <span className="text-[11px] text-zinc-400">
+                                                    {c.pctOfBest}% of max
+                                                </span>
+                                            )}
+                                            <span
+                                                className={cn(
+                                                    "text-[11px] font-medium shrink-0",
+                                                    c.delta > 0 ? "text-emerald-600" : "text-zinc-400"
+                                                )}
+                                            >
+                                                {c.delta === 0 ? 'matched' : `${c.delta > 0 ? '+' : '-'}${fmt(Math.abs(c.delta))}`}
+                                            </span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="text-[11px] text-zinc-300">No earlier week to beat</p>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
