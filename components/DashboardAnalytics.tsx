@@ -16,6 +16,7 @@ import {
     Table2, BarChart3, CalendarDays, Sparkles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatTokens } from '@/lib/format';
 import PeriodicBarChart from './PeriodicBarChart';
 
 type MetricKey = 'focus' | 'tasks' | 'exercises' | 'tokens';
@@ -74,11 +75,7 @@ const METRICS_CONFIG: Record<MetricKey, {
         extractValue: (r) => (r as DailyRecordWithTokens).total_tokens ?? 0,
         metricLabel: 'tokens',
         chartTitle: 'AI Token Usage',
-        formatValue: (v) => {
-            if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-            if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`;
-            return String(v);
-        },
+        formatValue: formatTokens,
     },
 };
 

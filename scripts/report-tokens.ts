@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as readline from 'node:readline';
 import dotenv from 'dotenv';
 import { parseClaudeLine, parseCodexLine } from './lib/token-parsers';
+import { formatTokens } from '../lib/format';
 
 export async function scanClaude(rootDir: string, cutoffMs: number): Promise<Map<string, number>> {
   const totals = new Map<string, number>();
@@ -142,12 +143,6 @@ function totalsToEntries(claude: Map<string, number>, codex: Map<string, number>
   for (const [date, tokens] of codex) out.push({ date, tool: 'codex', total_tokens: tokens });
   out.sort((a, b) => (a.date === b.date ? a.tool.localeCompare(b.tool) : a.date.localeCompare(b.date)));
   return out;
-}
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
 }
 
 async function postChunk(dashboardUrl: string, secret: string, entries: Entry[]): Promise<number> {
