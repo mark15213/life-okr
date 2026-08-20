@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getRecords } from '@/lib/db';
+import { getRecords, getRecordsSince } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +8,20 @@ const MAX_DAYS = 365;
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
+
+    // `since` is the open-ended form: no row cap, because callers that accumulate over an
+    // era (the vault) need every day in it, however many that has grown to.
+    const since = searchParams.get('since');
+    if (since) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+        return NextResponse.json(
+          { error: 'Invalid since parameter: must be a YYYY-MM-DD date' },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ records: await getRecordsSince(since) });
+    }
+
     const daysParam = searchParams.get('days') || '7';
     const days = parseInt(daysParam);
 

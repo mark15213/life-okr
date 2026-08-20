@@ -13,6 +13,7 @@ import useSWR from 'swr';
 import type { DailyRecord, TokenUsageRow } from '@/lib/db';
 import { withTicktickSummed } from '@/lib/utils';
 import { usePasscode } from '@/lib/usePasscode';
+import { VAULT_EPOCH } from '@/lib/vault';
 import { BarChart2, Lock, Unlock } from 'lucide-react';
 
 export default function Home() {
@@ -32,6 +33,9 @@ export default function Home() {
 
   const { data: todayData, mutate: mutateToday } = useSWR('/api/records/today', fetcher);
   const { data: recordsData, mutate: mutateRecords } = useSWR('/api/records?days=365', fetcher);
+  // The vault accumulates over its whole epoch, which will outgrow the 365-row display
+  // window, so it gets its own date-bounded query rather than a slice of the charts' data.
+  const { data: vaultRecordsData, mutate: mutateVaultRecords } = useSWR(`/api/records?since=${VAULT_EPOCH}`, fetcher);
   const { data: tokensData } = useSWR('/api/tokens?days=30', fetcher);
   const tokenEntries: TokenUsageRow[] = tokensData?.entries || [];
 
@@ -51,6 +55,7 @@ export default function Home() {
     : 0;
 
   const displayRecords: DailyRecord[] = records.map(withTicktickSummed);
+  const vaultRecords: DailyRecord[] = (vaultRecordsData?.records || []).map(withTicktickSummed);
 
   const handlePasscodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +74,7 @@ export default function Home() {
     await fetch('/api/records/cigarette', { method: 'POST', credentials: 'same-origin' });
     mutateToday();
     mutateRecords();
+    mutateVaultRecords();
   };
 
   const handleExercise = async (calories: number) => {
@@ -83,6 +89,7 @@ export default function Home() {
     });
     mutateToday();
     mutateRecords();
+    mutateVaultRecords();
   };
 
   const calculateWeeklyAverage = (field: keyof DailyRecord) => {
@@ -223,7 +230,7 @@ export default function Home() {
 
         {/* Floating action rail: tasks sit above the vault in the bottom-right corner */}
         <FloatingTasks isAuthed={isAuthed} onRequestUnlock={focusPasscode} />
-        <FloatingVault records={displayRecords} todayRecord={withTicktickSummed(todayRecord)} cumulativeBalance={cumulativeBalance} isAuthed={isAuthed} />
+        <FloatingVault records={vaultRecords} todayRecord={withTicktickSummed(todayRecord)} cumulativeBalance={cumulativeBalance} isAuthed={isAuthed} />
       </div>
     </main>
   );

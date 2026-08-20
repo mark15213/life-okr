@@ -5,6 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DailyRecord } from '@/lib/db';
 import { Gift, X, Plus, Clock, Lock, CheckCircle2, Dumbbell, Timer, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+    computeVaultEarnings,
+    nextMilestone,
+    VAULT_EPOCH,
+    EXERCISES_PER_REWARD,
+    TASKS_PER_REWARD,
+    FOCUS_MINUTES_PER_REWARD,
+} from '@/lib/vault';
 
 interface Purchase {
     id: number;
@@ -78,42 +86,11 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
     };
 
     const vault = useMemo(() => {
-        const allRecords = [...records];
-        const todayExists = allRecords.some(r => r.date === todayRecord.date);
-        if (!todayExists) allRecords.push(todayRecord);
-
-        let exerciseReward = 0;
-        let qualifyingExercises = 0;
-
-        // Only reward exercises if the user is out of pushup debt!
-        if (cumulativeBalance <= 0) {
-            for (const r of allRecords) {
-                if (r.cigarettes === 0) qualifyingExercises += r.exercises;
-            }
-            exerciseReward = Math.floor(qualifyingExercises / 2) * 100;
-        }
-
-        const totalTasks = allRecords.reduce((sum, r) => sum + r.tasks_completed, 0);
-        const taskReward = Math.floor(totalTasks / 10) * 100;
-
-        const totalFocusMinutes = allRecords.reduce((sum, r) => sum + r.focus_minutes, 0);
-        const focusReward = Math.floor(totalFocusMinutes / 300) * 100;
-
-        const totalEarned = exerciseReward + taskReward + focusReward;
+        // todayRecord goes last so its optimistic edits win over the fetched copy.
+        const earnings = computeVaultEarnings([...records, todayRecord], cumulativeBalance);
         const totalSpent = purchases.reduce((sum, p) => sum + p.cost, 0);
-        const balance = totalEarned - totalSpent;
 
-        return {
-            balance,
-            totalEarned,
-            totalSpent,
-            exerciseReward,
-            qualifyingExercises,
-            taskReward,
-            totalTasks,
-            focusReward,
-            totalFocusMinutes,
-        };
+        return { ...earnings, totalSpent, balance: earnings.totalEarned - totalSpent };
     }, [records, todayRecord, purchases, cumulativeBalance]);
 
     // Milestone effect trigger
@@ -195,14 +172,19 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
                             {/* Scrollable Content */}
                             <div className="p-6 overflow-y-auto">
                                 {/* Milestones */}
-                                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Next Milestones</h3>
+                                {/* The counters restart at the epoch, so say so — otherwise they read
+                                    as a lifetime tally that mysteriously reset. */}
+                                <div className="flex items-baseline justify-between mb-3">
+                                    <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Next Milestones</h3>
+                                    <span className="text-[10px] text-zinc-300">since {VAULT_EPOCH}</span>
+                                </div>
                                 <div className="grid grid-cols-1 gap-2 mb-8">
                                     <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 border border-zinc-100">
                                         <div className="flex items-center gap-2 text-sm text-zinc-600">
                                             <Dumbbell className="w-4 h-4 text-emerald-500" /> Smoke-free Workouts
                                         </div>
                                         <div className="text-xs font-medium text-zinc-400">
-                                            {vault.qualifyingExercises} / {(Math.floor(vault.qualifyingExercises / 2) + 1) * 2}
+                                            {vault.qualifyingExercises} / {nextMilestone(vault.qualifyingExercises, EXERCISES_PER_REWARD)}
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 border border-zinc-100">
@@ -210,7 +192,7 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
                                             <CheckCircle2 className="w-4 h-4 text-purple-500" /> Tasks Logged
                                         </div>
                                         <div className="text-xs font-medium text-zinc-400">
-                                            {vault.totalTasks} / {(Math.floor(vault.totalTasks / 10) + 1) * 10}
+                                            {vault.totalTasks} / {nextMilestone(vault.totalTasks, TASKS_PER_REWARD)}
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 border border-zinc-100">
@@ -218,7 +200,7 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
                                             <Timer className="w-4 h-4 text-cyan-500" /> Focus Time
                                         </div>
                                         <div className="text-xs font-medium text-zinc-400">
-                                            {Math.floor(vault.totalFocusMinutes / 60)}h / {(Math.floor(vault.totalFocusMinutes / 300) + 1) * 5}h
+                                            {Math.floor(vault.totalFocusMinutes / 60)}h / {nextMilestone(vault.totalFocusMinutes, FOCUS_MINUTES_PER_REWARD) / 60}h
                                         </div>
                                     </div>
                                 </div>

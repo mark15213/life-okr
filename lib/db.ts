@@ -81,6 +81,27 @@ export async function getRecords(days: number = DEFAULT_DAYS): Promise<DailyReco
   }
 }
 
+// Unlike getRecords, this is bounded by a date rather than a row count. The vault sums
+// every day since its epoch, and a row cap would silently drop the oldest of those once
+// the era outgrew it — quietly shrinking the balance.
+export async function getRecordsSince(since: string): Promise<DailyRecord[]> {
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+      throw new Error('since parameter must be a YYYY-MM-DD date');
+    }
+
+    const rows = await sql`
+      SELECT * FROM daily_records
+      WHERE date >= ${since}
+      ORDER BY date DESC
+    `;
+    return rows.map((r) => normalizeRecord(r as Record<string, unknown>));
+  } catch (error) {
+    console.error('Error fetching records since date:', error);
+    throw new Error(`Failed to fetch records: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 export async function ensureTodayRecord(): Promise<DailyRecord> {
   return ensureRecord(todayInAppTz());
 }
