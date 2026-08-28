@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Calendar, Dumbbell, Flame, Timer, CheckCircle2, Lock } from 'lucide-react';
+import { Plus, X, Calendar, Dumbbell, Sparkles, Timer, CheckCircle2, Lock } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { usePasscode } from '@/lib/usePasscode';
 
@@ -10,6 +10,10 @@ interface BackfillModalProps {
     onSuccess: () => void;
     isAuthed?: boolean;
 }
+
+// Mirrors CALORIES_PER_EXERCISE in app/api/records/backfill/route.ts — the server is what
+// actually writes the number; this is only here so the form can say what it will be.
+const CALORIES_PER_EXERCISE = 200;
 
 export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProps) {
     const passcode = usePasscode();
@@ -21,9 +25,9 @@ export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProp
     // Default to yesterday
     const [date, setDate] = useState(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
     const [exercises, setExercises] = useState('');
-    const [calories, setCalories] = useState('');
     const [focus, setFocus] = useState('');
     const [tasks, setTasks] = useState('');
+    const [tokens, setTokens] = useState('');
 
     const [error, setError] = useState<string | null>(null);
 
@@ -37,11 +41,18 @@ export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProp
         }
 
         const numExercises = exercises ? parseInt(exercises, 10) : 0;
-        const numCalories = calories ? parseInt(calories, 10) : 0;
         const numFocus = focus ? parseInt(focus, 10) : 0;
         const numTasks = tasks ? parseInt(tasks, 10) : 0;
+        // Blank means "leave the day's token total alone", so an empty field stays out of
+        // the payload entirely rather than being sent as a 0 that would overwrite it.
+        const numTokens = tokens.trim() ? parseInt(tokens, 10) : null;
 
-        if (numExercises === 0 && numCalories === 0 && numFocus === 0 && numTasks === 0) {
+        if (numTokens !== null && (!Number.isFinite(numTokens) || numTokens < 0)) {
+            setError('Tokens must be a non-negative number.');
+            return;
+        }
+
+        if (numExercises === 0 && numFocus === 0 && numTasks === 0 && numTokens === null) {
             setError('Please enter at least one value.');
             return;
         }
@@ -61,9 +72,9 @@ export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProp
                 body: JSON.stringify({
                     date,
                     exercises: numExercises,
-                    calories: numCalories,
                     focus: numFocus,
                     tasks: numTasks,
+                    ...(numTokens !== null ? { tokens: numTokens } : {}),
                 }),
             });
 
@@ -78,9 +89,9 @@ export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProp
 
             // Reset form
             setExercises('');
-            setCalories('');
             setFocus('');
             setTasks('');
+            setTokens('');
             setIsOpen(false);
             onSuccess();
         } catch (err: unknown) {
@@ -160,21 +171,28 @@ export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProp
                                             onChange={(e) => setExercises(e.target.value)}
                                             className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all text-zinc-900"
                                         />
+                                        <p className="text-[11px] text-zinc-400">
+                                            {CALORIES_PER_EXERCISE} kcal each
+                                        </p>
                                     </div>
 
-                                    {/* Calories */}
+                                    {/* Codex Tokens */}
                                     <div className="space-y-1.5">
                                         <label className="text-[11px] font-semibold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
-                                            <Flame className="w-3.5 h-3.5 text-orange-500" /> Calories
+                                            <Sparkles className="w-3.5 h-3.5 text-pink-500" /> Codex Tokens
                                         </label>
                                         <input
                                             type="number"
                                             min="0"
-                                            placeholder="kcal"
-                                            value={calories}
-                                            onChange={(e) => setCalories(e.target.value)}
+                                            step="1"
+                                            placeholder="Total"
+                                            value={tokens}
+                                            onChange={(e) => setTokens(e.target.value)}
                                             className="w-full bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-300 transition-all text-zinc-900"
                                         />
+                                        <p className="text-[11px] text-zinc-400">
+                                            Replaces the day&apos;s total
+                                        </p>
                                     </div>
 
                                     {/* Focus Time */}

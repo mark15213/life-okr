@@ -15,7 +15,7 @@ type DailyRecordWithTokens = DailyRecord & { total_tokens: number };
 export default function AnalyticsPage() {
     const fetcher = (url: string) => fetch(url).then(res => res.json());
     const { data: recordsData, mutate } = useSWR('/api/records?days=365', fetcher);
-    const { data: tokensData } = useSWR('/api/tokens?days=365', fetcher);
+    const { data: tokensData, mutate: mutateTokens } = useSWR('/api/tokens?days=365', fetcher);
 
     const loading = !recordsData || !tokensData;
 
@@ -35,8 +35,11 @@ export default function AnalyticsPage() {
       }));
     }, [recordsData, tokensData]);
 
+    // Backfill can write tokens as well as daily_records, so both sources have to
+    // revalidate — refreshing only the records would leave a backfilled token total invisible.
     const fetchData = () => {
         mutate();
+        mutateTokens();
     };
 
     if (loading) {
