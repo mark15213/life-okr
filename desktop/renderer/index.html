@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Hustle · Focus</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="widget" hidden aria-label="桌面番茄钟">
+    <div id="pill" class="pill">
+      <span class="drag-grip" title="拖动浮标"></span>
+      <button id="widget-clock" class="clock" title="查看本轮专注">30:00</button>
+      <span class="divider"></span>
+      <button id="widget-task" class="widget-task" title="打开任务切换器"><i class="dot work"></i><span>选择任务</span></button>
+      <button id="widget-toggle" class="icon-button" aria-label="开始番茄"></button>
+      <span class="drag-grip trailing"></span>
+    </div>
+  </section>
+  <main id="panel" hidden>
+    <header><h1>Hustle.</h1><span class="eyebrow">DESKTOP FOCUS</span><button id="hide-panel" class="quiet close" title="收起，计时继续" aria-label="收起窗口">×</button></header>
+    <nav aria-label="页面"><button data-view="tasks" class="active">任务</button><button data-view="history">历史</button><button data-view="settings">设置</button></nav>
+    <div id="notice" class="notice" hidden><span></span><button id="dismiss-notice" class="quiet" aria-label="关闭提示">×</button></div>
+    <section id="tasks-view" class="view">
+      <div class="section-heading"><h2>Switch task</h2><button id="sync" class="quiet">刷新任务</button></div>
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"></circle><path d="m15 15 5 5"></path></svg><input id="search" placeholder="搜索任务…" aria-label="搜索任务" autocomplete="off"></label>
+      <div class="summary"><span id="round-summary">选择任务，开始一轮专注</span><span>本轮投入</span></div>
+      <div id="task-list" role="listbox" aria-label="可切换的任务"></div>
+      <div id="empty" class="empty" hidden><strong>从一个任务开始。</strong><p>创建本地任务，或在设置中连接看板，读取 TickTick 任务。</p></div>
+      <form id="add-form" class="add-form"><input id="new-task" aria-label="新任务名称" placeholder="添加本地任务…" maxlength="200" required><button type="submit" class="quiet" aria-label="添加任务">＋</button></form>
+      <div class="keyboard-hints"><span><kbd>↑</kbd> <kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 切换</span><span><kbd>Esc</kbd> 收起</span></div>
+      <div id="round-controls" class="round-controls"><div><strong id="panel-clock">30:00</strong><span id="current-label">尚未开始</span></div><button id="finish" class="secondary" hidden>结束本轮</button><button id="toggle" class="primary">开始专注</button></div>
+      <p class="footnote">切换任务，总倒计时继续。暂停时，所有计时停止。</p>
+    </section>
+    <section id="history-view" class="view" hidden><div class="section-heading"><h2>Focus history</h2><span class="muted">本机记录</span></div><p class="footnote">按轮记录实际专注及任务分配。今日统计使用上海时区。</p><div id="history-list"></div></section>
+    <section id="settings-view" class="view" hidden>
+      <h2>Preferences</h2>
+      <form id="connection-form" class="settings-group"><h3>连接人生看板</h3><p class="footnote">读取 TickTick 任务，离线时使用缓存。专注记录保存在本机。</p><label>看板地址<input id="server" type="url" placeholder="https://your-dashboard.vercel.app" required></label><label>看板解锁码<input id="code" type="password" autocomplete="off" required></label><button id="connect" class="primary">连接并同步</button><span id="sync-status" class="footnote"></span></form>
+      <div class="settings-group"><h3>番茄与浮标</h3><label class="setting-row">新一轮时长<select id="minutes"><option value="15">15 分钟</option><option value="25">25 分钟</option><option value="30">30 分钟</option><option value="45">45 分钟</option><option value="60">60 分钟</option></select></label><label class="setting-row">浮标始终置顶<input id="topmost" type="checkbox"></label><label class="setting-row">锁定浮标位置<input id="locked" type="checkbox"></label><label class="setting-row">到时提示音<input id="sound" type="checkbox"></label><p id="notification-status" class="footnote">系统通知和提示音受系统勿扰及通知权限控制。</p></div>
+      <form id="shortcut-form" class="settings-group"><h3>全局快捷键</h3><p id="shortcut-help" class="footnote"></p><label>打开任务切换器<input id="shortcut-switch" required></label><label>切回上一任务<input id="shortcut-previous" required></label><label>暂停 / 继续<input id="shortcut-pause" required></label><button class="secondary">保存快捷键</button><p id="shortcut-errors" class="error" role="status"></p></form>
+      <div class="settings-group"><h3>本地数据</h3><p class="footnote">关闭主窗口会继续计时。锁屏、休眠或从托盘退出会暂停。重启后主动继续；两台设备独立记录。</p><button id="data-folder" class="secondary">打开数据目录</button></div>
+    </section>
+    <div id="error" class="error-toast" role="alert" hidden></div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

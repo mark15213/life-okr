@@ -42,6 +42,17 @@
 
 ## 开始使用
 
+### 桌面番茄客户端
+
+Windows / Apple Silicon Mac 桌面浮标与全局番茄钟位于 `desktop/`。支持一轮番茄内快捷切换任务、分任务用时、系统提醒和离线保存。
+
+```bash
+npm --prefix desktop install
+npm run desktop:dev
+```
+
+任务切换：Windows `Ctrl + Alt + K`；Mac `Control + Option + K`。安装、连接看板、快捷键和打包说明见 [desktop/README.md](desktop/README.md)。
+
 ### 1. 安装依赖
 
 ```bash

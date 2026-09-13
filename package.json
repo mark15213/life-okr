@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "desktop:dev": "npm --prefix desktop start",
+    "desktop:test": "node --test desktop/tests/*.test.mjs",
+    "desktop:win": "npm --prefix desktop run dist:win",
+    "desktop:mac": "npm --prefix desktop run dist:mac",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
