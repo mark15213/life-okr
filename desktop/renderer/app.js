@@ -77,8 +77,12 @@ function swapTaskName(container, title, list) {
 /* Text that does not fit gets a slow back-and-forth scroll instead of an ellipsis. Measured
    after layout, so it is re-checked every render and drops the scroll once the text fits. */
 function marquee(node) {
-  if (!node) return;
-  const overflow = node.scrollWidth - node.clientWidth;
+  // Animation cleanup may run again after a later task switch removed this node.
+  if (!node?.parentElement) return;
+  // The moving element must sit inside a clipping parent: moving the clipper itself moves the
+  // clip window along with the text, so nothing new is ever revealed.
+  const clip = node.parentElement;
+  const overflow = node.scrollWidth - clip.clientWidth;
   if (overflow > 2 && !reduceMotion) {
     if (node.dataset.shift !== String(overflow)) {
       node.dataset.shift = String(overflow);
@@ -114,7 +118,7 @@ function render(next) {
     renderWidgetQueue();
     requestAnimationFrame(() => {
       marquee($('widget-task').querySelector('.task-swap>span:not(.leaving):not(.entering)'));
-      $('widget-queue').querySelectorAll('.widget-queue-chip>span').forEach(marquee);
+      $('widget-queue').querySelectorAll('.widget-queue-chip .clip>span').forEach(marquee);
     });
     lastTaskId = task?.id;
     return;
@@ -156,7 +160,8 @@ function renderWidgetQueue() {
     const chip = el('button', 'widget-queue-chip');
     chip.setAttribute('role', 'option');
     chip.style.setProperty('--i', index);
-    chip.append(el('i', `dot ${category(task.list)}`), el('span', '', task.title));
+    const clip = el('span', 'clip'); clip.append(el('span', '', task.title));
+    chip.append(el('i', `dot ${category(task.list)}`), clip);
     chip.title = `${index === 0 ? '下一个' : `第 ${index + 1} 个`}：${task.title}\n点击切换`;
     chip.onclick = e => { e.stopPropagation(); void command('select', task.id); };
     fragment.append(chip);

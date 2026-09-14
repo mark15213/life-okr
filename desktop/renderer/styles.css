@@ -700,7 +700,12 @@ h1 {
 .widget-queue-chip .dot {
   width:5px;
   height:5px}
-.widget-queue-chip span {
+.widget-queue-chip .clip {
+  flex:1;
+  min-width:0;
+  overflow:hidden}
+.widget-queue-chip .clip>span {
+  display:block;
   overflow:hidden;
   white-space:nowrap;
   text-overflow:ellipsis}
@@ -718,7 +723,9 @@ h1 {
 
 /* ---- marquee for text that does not fit ---- */
 .marquee {
+  overflow:visible!important;
   text-overflow:clip!important;
+  width:max-content;
   animation:marquee var(--marquee-duration,6s) ease-in-out infinite!important;
   will-change:transform}
 @keyframes marquee {
