@@ -19,7 +19,6 @@ async function boot() {
   const WIDGET = { width: 300, height: 98 };
   await app.whenReady();
   const appIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png'));
-  if (process.platform === 'darwin') app.dock.setIcon(appIcon);
   const file = path.join(app.getPath('userData'), 'focus-state.json');
   const loaded = storage.read(file, restoreState, emptyState);
   loaded.state.settings.server ||= DEFAULT_SERVER;
@@ -86,6 +85,7 @@ async function boot() {
     // The workspace transition can make the app a background UI element.
     // Restore its Dock presence after configuring the floating window.
     await app.dock.show();
+    app.dock.setIcon(appIcon);
   }
   widget.on('moved', () => {
     clearTimeout(moveTimer);
