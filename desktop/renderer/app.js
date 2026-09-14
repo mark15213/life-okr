@@ -205,3 +205,5 @@ if (isWidget) {
 api.onState(render);
 api.onView(setView);
 run(async () => { render(await api.get()); if (!isWidget) setView('tasks'); });
+
+document.getElementById('open-dashboard').addEventListener('click', () => window.hustle.dashboard());

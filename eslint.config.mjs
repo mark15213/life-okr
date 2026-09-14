@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "desktop/node_modules/**",
     "desktop/release/**",
+    "desktop/web-dist/**",
     "desktop/test-output/**",
   ]),
 ]);

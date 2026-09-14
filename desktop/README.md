@@ -1,19 +1,20 @@
 # Hustle Desktop
 
-Windows x64 / macOS Apple Silicon 桌面客户端。使用独立 Electron 主进程管理计时，界面不依赖 Next.js 开发服务器；连接已有看板后可读取 TickTick 任务，也可直接创建本地任务。
+Windows x64 / macOS Apple Silicon 桌面客户端。使用独立 Electron 主进程管理计时，界面不依赖 Next.js 开发服务器；主窗口复用网页首页、趋势与分类统计、运动/吸烟记录、历史补录、奖励金库和任务管理组件，连接同一个真实后端。
 
 ## 启动
 
 需要 Node.js 22.12+（建议 24 LTS）。在仓库根目录运行：
 
 ```powershell
+npm ci
 npm --prefix desktop install
 npm run desktop:dev
 ```
 
 也支持在 `desktop` 中使用 pnpm，仓库提交了 `pnpm-lock.yaml` 和构建脚本许可配置。安装需要下载 Electron。
 
-启动后出现 256 × 48 的深色胶囊浮标；第一次会打开任务面板。创建任务 → 选择任务 → 开始专注。点击浮标的任务名称展开切换器；点击暂停图标暂停或继续；拖动胶囊两侧空白处移动。右键浮标或使用托盘菜单设置置顶、锁定位置及隐藏。
+启动后出现 256 × 48 的深色胶囊浮标；同时打开完整看板。顶部“任务与番茄”或快捷键打开任务面板。创建任务 → 选择任务 → 开始专注。点击浮标的任务名称展开切换器；点击暂停图标暂停或继续；拖动胶囊两侧空白处移动。右键浮标或使用托盘菜单设置置顶、锁定位置及隐藏。
 
 ## 全局快捷键
 
@@ -37,11 +38,11 @@ npm run desktop:dev
 
 ## 连接 TickTick 任务
 
-设置 → 输入已部署人生看板的根地址和看板解锁码 → 连接并同步。服务端须已有可用 TickTick 会话。桌面只请求现有 `/api/auth/unlock` 与 `/api/ticktick/tasks`。
+设置 → 输入已部署人生看板的根地址和看板解锁码 → 连接并同步。服务端须已有可用 TickTick 会话。默认地址是 `https://hustle-beta-i.vercel.app`。也可直接在完整看板输入解锁码；主窗口和任务面板共用登录会话。网页已有记录接口通过主进程白名单访问，不需要单独运行或部署后端。
 
 远端地址必须为 HTTPS，本机调试允许 `http://localhost:3000`。解锁码只用于此次请求，不存入计时文件；HttpOnly 登录 Cookie 交给 Electron 的独立持久会话管理，不暴露给界面。网络请求有 20 秒超时，禁止重定向。每五分钟自动刷新，也可手动刷新。
 
-首次没有缓存时可创建本地任务。同步失败保留缓存，不影响计时。本版不上传专注片段到 TickTick 或看板，避免多任务番茄映射及回流重复统计；两台设备分别记录。
+首次没有缓存时可创建本地任务。同步失败保留缓存，不影响计时。新结束的远端任务番茄按任务和上海日期合并片段，累计满一分钟时同步到现有 TickTick 专注接口，再刷新看板统计。重试沿用固定记录 ID，避免重复；未同步状态随本地历史持久化。原有历史不追溯上传，本地任务与不足一分钟的云端条目只保存在本机。两台设备的计时各自独立。
 
 ## 数据与恢复
 
@@ -53,15 +54,18 @@ Windows 通常位于 `%APPDATA%/Hustle`；macOS 通常位于 `~/Library/Applicat
 
 ```powershell
 npm run desktop:test
+npm --prefix desktop run build:web
 npm --prefix desktop run test:smoke
+node desktop/tests/dashboard.cjs
 npm run desktop:win
 ```
 
-不需要安装器时可运行 `npm --prefix desktop run dist:zip`，解压 `Hustle-0.1.0-win.zip` 后双击其中的 `Hustle.exe`；需要保留解压目录中的所有文件。
+不需要安装器时可运行 `npm --prefix desktop run dist:zip`，解压 `Hustle-0.2.0-win.zip` 后双击其中的 `Hustle.exe`；需要保留解压目录中的所有文件。
 
 在 Apple Silicon Mac 上：
 
 ```sh
+npm ci
 npm --prefix desktop install
 npm run desktop:mac
 ```

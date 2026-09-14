@@ -2,9 +2,9 @@ name: Desktop checks and packages
 on:
   workflow_dispatch:
   push:
-    paths: ['desktop/**', '.github/workflows/desktop.yml']
+    paths: ['desktop/**', 'app/**', 'components/**', 'lib/**', 'package*.json', '.github/workflows/desktop.yml']
   pull_request:
-    paths: ['desktop/**', '.github/workflows/desktop.yml']
+    paths: ['desktop/**', 'app/**', 'components/**', 'lib/**', 'package*.json', '.github/workflows/desktop.yml']
 permissions:
   contents: read
 jobs:
@@ -29,6 +29,8 @@ jobs:
         with:
           version: 11
           run_install: false
+      - run: npm ci
+        working-directory: .
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
       - run: pnpm run ${{ matrix.target }}

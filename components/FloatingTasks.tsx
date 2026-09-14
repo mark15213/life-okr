@@ -17,6 +17,7 @@ import {
     Timer,
     X,
 } from 'lucide-react';
+import { useDesktopFocus } from '@/lib/useDesktopFocus';
 import { cn } from '@/lib/utils';
 import { CAPTURE_LIST_KEYS, TASK_LISTS, type TaskListKey } from '@/lib/ticktick/lists';
 import {
@@ -150,9 +151,12 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
     const [isOpen, setIsOpen] = useState(false);
     const [hydrated, setHydrated] = useState(false);
 
-    const [session, setSession] = useState<PomodoroSession | null>(null);
+    const desktop = useDesktopFocus();
+    const [browserSession, setSession] = useState<PomodoroSession | null>(null);
+    const session = desktop.enabled ? desktop.session : browserSession;
     const [pending, setPending] = useState<PendingFocus | null>(null);
     const [durationMin, setDurationMin] = useState<number>(DEFAULT_FOCUS_MINUTES);
+    useEffect(() => { if (desktop.minutes) setDurationMin(desktop.minutes); }, [desktop.minutes]);
     const [durationOpen, setDurationOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [now, setNow] = useState(() => Date.now());
@@ -181,6 +185,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
     /* ---------------------------------------------------------------- persistence */
 
     useEffect(() => {
+        if (desktop.enabled) { setHydrated(true); return; }
         setSession(readStored(POMODORO_STORAGE_KEY, parseStoredSession));
         setPending(readStored(POMODORO_PENDING_KEY, parseStoredPending));
 
@@ -188,23 +193,23 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
         if ((FOCUS_DURATION_OPTIONS as readonly number[]).includes(stored)) setDurationMin(stored);
 
         setHydrated(true);
-    }, []);
+    }, [desktop.enabled]);
 
     useEffect(() => {
-        if (hydrated) writeStored(POMODORO_STORAGE_KEY, session);
-    }, [hydrated, session]);
+        if (hydrated && !desktop.enabled) writeStored(POMODORO_STORAGE_KEY, session);
+    }, [hydrated, session, desktop.enabled]);
 
     useEffect(() => {
-        if (hydrated) writeStored(POMODORO_PENDING_KEY, pending);
-    }, [hydrated, pending]);
+        if (hydrated && !desktop.enabled) writeStored(POMODORO_PENDING_KEY, pending);
+    }, [hydrated, pending, desktop.enabled]);
 
     /* ---------------------------------------------------------------------- clock */
 
     useEffect(() => {
-        if (!session || session.pausedAt !== null) return;
+        if (desktop.enabled || !session || session.pausedAt !== null) return;
         const id = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(id);
-    }, [session]);
+    }, [session, desktop.enabled]);
 
     useEffect(() => {
         // A backgrounded tab has its timers throttled, so the clock catches up the moment the
@@ -288,6 +293,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
 
     const finish = useCallback(
         async (target: PomodoroSession) => {
+            if (desktop.bridge) { await desktop.bridge.command('finish'); return; }
             if (finishingRef.current === target.sessionId) return;
             finishingRef.current = target.sessionId;
 
@@ -308,15 +314,20 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
             await upload(record);
             finishingRef.current = null;
         },
-        [upload]
+        [upload, desktop.bridge]
     );
 
     useEffect(() => {
-        if (session && session.pausedAt === null && isComplete(session, now)) void finish(session);
-    }, [session, now, finish]);
+        if (!desktop.enabled && session && session.pausedAt === null && isComplete(session, now)) void finish(session);
+    }, [session, now, finish, desktop.enabled]);
 
     const begin = useCallback(
         async (task: Pick<PanelTask, 'id' | 'title' | 'list'>) => {
+            if (desktop.bridge) {
+                try { await desktop.bridge.focusTask(task.id); }
+                catch (error) { setNotice({ tone: 'error', message: String(error) }); }
+                return;
+            }
             // Starting a second pomodoro banks the first rather than discarding it — switching
             // tasks mid-flow is normal, and the time already spent was still spent.
             if (session) await finish(session);
@@ -335,13 +346,14 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
             );
             setNow(Date.now());
         },
-        [session, finish, durationMin]
+        [session, finish, durationMin, desktop.bridge]
     );
 
     const chooseDuration = (minutes: number) => {
         setDurationMin(minutes);
         setDurationOpen(false);
-        writeStored(POMODORO_DURATION_KEY, minutes);
+        if (desktop.bridge) void desktop.bridge.settings({ minutes });
+        else writeStored(POMODORO_DURATION_KEY, minutes);
     };
 
     /* ----------------------------------------------------------------- task writes */
@@ -443,7 +455,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
         })).filter((g) => g.items.length > 0);
     }, [tasks, filter]);
 
-    const remaining = session ? remainingMs(session, now) : 0;
+    const remaining = desktop.enabled ? desktop.remaining : session ? remainingMs(session, now) : 0;
     const progress = session ? 1 - remaining / (session.durationMin * 60_000) : 0;
 
     useEffect(() => {
@@ -1007,6 +1019,7 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
 
                                         <button
                                             onClick={() => {
+                                                if (desktop.bridge) { void desktop.bridge.command('toggle'); return; }
                                                 const at = Date.now();
                                                 setSession((s) =>
                                                     s

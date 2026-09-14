@@ -3,6 +3,8 @@ const { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage,
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const storage = require('./storage.cjs');
+const { focusUploads } = require('./focus-upload.cjs');
+const { DEFAULT_SERVER, serverURL, validateRequest } = require('./api.cjs');
 
 app.setName('Hustle');
 app.setAppUserModelId('com.lifeokr.hustle');
@@ -17,11 +19,13 @@ async function boot() {
   await app.whenReady();
   const file = path.join(app.getPath('userData'), 'focus-state.json');
   const loaded = storage.read(file, restoreState, emptyState);
+  loaded.state.settings.server ||= DEFAULT_SERVER;
   const engine = new FocusEngine(loaded.state);
   let notice = loaded.error || (loaded.recovered ? '已恢复上次番茄，当前已暂停。点击继续即可接着专注。' : '');
   let quitting = false, syncing = false, savingFailed = false;
   let shortcutErrors = [];
   let timer, checkpoint, syncTimer, moveTimer;
+  let uploadingFocus = false;
   app.on('before-quit', () => {
     quitting = true; clearInterval(timer); clearInterval(checkpoint); clearInterval(syncTimer);
     clearTimeout(moveTimer); engine.pause(); persist();
@@ -29,6 +33,8 @@ async function boot() {
   app.on('will-quit', () => globalShortcut.unregisterAll());
   const page = path.join(__dirname, 'renderer', 'index.html');
   const trustedURL = pathToFileURL(page).href;
+  const dashboardPage = path.join(__dirname, 'web-dist', 'index.html');
+  const dashboardURL = pathToFileURL(dashboardPage).href;
   const apiSession = session.fromPartition('persist:hustle-api');
   apiSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
 
@@ -40,8 +46,9 @@ async function boot() {
   const panel = new BrowserWindow({ width: 490, height: 740, minWidth: 420, minHeight: 620,
     title: 'Hustle · Focus', backgroundColor: '#ffffff', show: false, autoHideMenuBar: true,
     webPreferences: safe });
+  const dashboard = new BrowserWindow({ width: 1280, height: 900, minWidth: 800, minHeight: 600, title: 'Hustle', show: false, autoHideMenuBar: true, webPreferences: safe });
   panel.setMenuBarVisibility(false);
-  for (const win of [widget, panel]) {
+  for (const win of [widget, panel, dashboard]) {
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     win.webContents.on('will-navigate', e => e.preventDefault());
     win.webContents.session.setPermissionRequestHandler((_wc, _p, cb) => cb(false));
@@ -99,7 +106,7 @@ async function boot() {
   }
   function broadcast() {
     const value = snapshot();
-    for (const win of [widget, panel]) if (!win.isDestroyed() && !win.webContents.isLoadingMainFrame()) win.webContents.send('focus:state', value);
+    for (const win of [widget, panel, dashboard]) if (!win.isDestroyed() && !win.webContents.isLoadingMainFrame()) win.webContents.send('focus:state', value);
     const round = engine.state.current;
     tray?.setToolTip(`Hustle${round ? ` · ${Math.ceil((round.durationMs - round.elapsedMs) / 60000)} 分钟 · ${engine.task()?.title ?? '已暂停'}` : ' · 选择任务开始'}`.slice(0, 120));
   }
@@ -111,7 +118,8 @@ async function boot() {
       notice = '本地保存失败，计时已暂停。请检查磁盘空间或目录权限后重试。';
     }
   }
-  function update() { pulse(); persist(); broadcast(); refreshMenu(); }
+  function update() { pulse(); if (engine.state.current && !engine.state.current.cloudServer) engine.state.current.cloudServer = engine.state.settings.server; persist(); broadcast(); refreshMenu(); void uploadFocus(); }
+  function openDashboard() { dashboard.show(); dashboard.focus(); }
   function openPanel(view = 'tasks') {
     panel.show(); panel.focus(); panel.webContents.send('focus:view', view);
   }
@@ -131,7 +139,7 @@ async function boot() {
         notification.on('failed', () => { notice = '本轮已完成。系统通知未送达，可在系统设置中检查通知权限。'; broadcast(); });
         notification.show();
       }
-      widget.showInactive(); refreshMenu();
+      widget.showInactive(); refreshMenu(); void uploadFocus();
     }
     return finished;
   }
@@ -165,8 +173,9 @@ async function boot() {
   function refreshMenu() {
     const settings = engine.state.settings;
     const menu = Menu.buildFromTemplate([
+      { label: '打开完整看板', click: openDashboard },
       { label: '打开任务切换器', click: () => openPanel() },
-      { label: widget.isVisible() ? '隐藏浮标' : '显示浮标', click: () => { widget.isVisible() ? widget.hide() : widget.showInactive(); refreshMenu(); } },
+      { label: widget.isVisible() ? '隐藏浮标' : '显示浮标', click: () => { if (widget.isVisible()) widget.hide(); else widget.showInactive(); refreshMenu(); } },
       { label: engine.state.current?.status === 'running' ? '暂停番茄' : '开始 / 继续', click: () => action(() => engine.toggle()) },
       { label: '始终置顶', type: 'checkbox', checked: settings.topmost, click: item => action(() => { settings.topmost = item.checked; widget.setAlwaysOnTop(item.checked); }) },
       { label: '锁定位置', type: 'checkbox', checked: settings.locked, click: item => action(() => { settings.locked = item.checked; widget.setMovable(!item.checked); }) },
@@ -177,11 +186,12 @@ async function boot() {
     tray.setContextMenu(menu);
     return menu;
   }
-  tray.on('click', () => openPanel());
+  tray.on('click', openDashboard);
   widget.webContents.on('context-menu', () => refreshMenu().popup({ window: widget }));
 
   function validSender(event) {
-    return [widget.webContents, panel.webContents].includes(event.sender) && event.senderFrame === event.sender.mainFrame && event.senderFrame.url.split('?')[0] === trustedURL;
+    const expected = event.sender === dashboard.webContents ? dashboardURL : trustedURL;
+    return [widget.webContents, panel.webContents, dashboard.webContents].includes(event.sender) && event.senderFrame === event.sender.mainFrame && event.senderFrame.url.split(/[?#]/)[0] === expected;
   }
   const handle = (channel, handler) => ipcMain.handle(channel, async (event, payload) => {
     if (!validSender(event)) throw new Error('Untrusted sender');
@@ -190,6 +200,30 @@ async function boot() {
   });
   handle('focus:get', () => snapshot());
   handle('focus:open', () => openPanel());
+  handle('focus:dashboard', openDashboard);
+  handle('dashboard:request', async input => {
+    const req = validateRequest(input);
+    const server = serverURL(engine.state.settings.server);
+    const response = await apiSession.fetch(server + req.path, {
+      method: req.method, body: req.body, headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', redirect: 'error', signal: AbortSignal.timeout(20000),
+    });
+    const body = await response.text();
+    if (Buffer.byteLength(body) > 10000000) throw new Error('响应过大');
+    if (response.ok && req.path.split('?')[0] === '/api/ticktick/tasks' && req.method === 'GET') {
+      pulse(); engine.syncTasks(JSON.parse(body).tasks, server); update();
+    }
+    if (response.ok && req.method !== 'GET' && req.path.startsWith('/api/ticktick/tasks')) await refresh();
+    return { status: response.status, body };
+  });
+  handle('focus:task', async id => {
+    if (typeof id !== 'string') throw new Error('任务无效');
+    let task = engine.state.tasks.find(t => t.externalId === id && !t.archived);
+    if (!task) { await refresh(); task = engine.state.tasks.find(t => t.externalId === id && !t.archived); }
+    if (!task) throw new Error('任务已移除，请刷新后重试');
+    pulse(); engine.select(task.id); if (!engine.state.current) engine.start();
+    update(); return snapshot();
+  });
   handle('focus:hide', () => panel.hide());
   handle('focus:command', ({ type, value } = {}) => {
     pulse();
@@ -226,12 +260,6 @@ async function boot() {
     widget.setAlwaysOnTop(s.topmost); widget.setMovable(!s.locked); update(); return snapshot();
   });
 
-  function serverURL(value) {
-    const u = new URL(value);
-    if (u.username || u.password || (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['localhost','127.0.0.1','[::1]'].includes(u.hostname)))) throw new Error('请使用 HTTPS 看板地址（本机可用 http://localhost）');
-    if (u.pathname !== '/' || u.search || u.hash) throw new Error('请输入看板根地址，不要包含路径');
-    return u.origin;
-  }
   async function request(server, route, options = {}) {
     const response = await apiSession.fetch(`${server}${route}`, { ...options, credentials: 'include',
       redirect: 'error', signal: AbortSignal.timeout(20000) });
@@ -254,11 +282,39 @@ async function boot() {
     syncing = true; broadcast();
     try {
       await request(server, '/api/auth/unlock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
-      await sync(server);
       engine.state.settings.server = server;
+      persist();
+      dashboard.webContents.send('dashboard:refresh');
+      await sync(server);
       update(); return snapshot();
     } finally { syncing = false; broadcast(); }
   });
+  async function uploadFocus() {
+    if (uploadingFocus || savingFailed || quitting) return;
+    uploadingFocus = true;
+    try {
+      let changed = false;
+      for (const round of engine.state.history) {
+        if (!round.cloudServer || round.cloudServer !== engine.state.settings.server || round.cloudUploaded) continue;
+        const records = focusUploads(round);
+        for (const record of records) {
+          if (round.cloudSent?.includes(record.sessionId)) continue;
+          await request(serverURL(round.cloudServer), '/api/ticktick/focus', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(record),
+          });
+          (round.cloudSent ||= []).push(record.sessionId); engine.state.focusNeedsSync = true; persist(); changed = true;
+        }
+        round.cloudUploaded = true; persist();
+      }
+      if (changed || engine.state.focusNeedsSync) {
+        await request(serverURL(engine.state.settings.server), '/api/ticktick/sync', { method: 'POST' });
+        engine.state.focusNeedsSync = false; persist();
+        notice = '专注记录已同步到看板。'; dashboard.webContents.send('dashboard:refresh'); broadcast();
+      }
+    } catch {
+      notice = '专注已保存在本机，云端同步未完成；连接恢复后会自动重试。'; broadcast();
+    } finally { uploadingFocus = false; }
+  }
   async function refresh() {
     if (syncing || !engine.state.settings.server) return;
     syncing = true; broadcast();
@@ -270,18 +326,19 @@ async function boot() {
   handle('focus:data-folder', () => shell.openPath(app.getPath('userData')));
 
   registerShortcuts();
-  await Promise.all([widget.loadFile(page, { query: { view: 'widget' } }), panel.loadFile(page)]);
+  await Promise.all([widget.loadFile(page, { query: { view: 'widget' } }), panel.loadFile(page), dashboard.loadFile(dashboardPage)]);
   widget.showInactive();
-  if (!engine.state.tasks.length || loaded.error || shortcutErrors.length) openPanel(engine.state.tasks.length ? 'settings' : 'tasks');
+  openDashboard();
+  if (loaded.error || shortcutErrors.length) openPanel('settings');
   refreshMenu(); broadcast();
   timer = setInterval(() => { pulse(); broadcast(); }, 250);
   checkpoint = setInterval(() => { if (engine.state.current?.status === 'running') { pulse(); persist(); } }, 2000);
-  syncTimer = setInterval(refresh, 5 * 60000);
+  syncTimer = setInterval(() => { void refresh(); void uploadFocus(); }, 5 * 60000);
   const pauseForSystem = () => { pulse(); engine.pause(); notice = '系统已锁定或休眠，番茄已暂停。回来后请点击继续。'; update(); };
   powerMonitor.on('suspend', pauseForSystem);
   powerMonitor.on('lock-screen', pauseForSystem);
   powerMonitor.on('shutdown', () => { engine.pause(); persist(); });
-  app.on('second-instance', () => openPanel());
-  app.on('activate', () => openPanel());
+  app.on('second-instance', openDashboard);
+  app.on('activate', openDashboard);
   app.on('window-all-closed', () => {});
 }

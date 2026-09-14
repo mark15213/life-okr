@@ -6,6 +6,14 @@ const invoke = async (channel, value) => {
 };
 contextBridge.exposeInMainWorld('hustle', {
   get: () => invoke('focus:get'),
+  request: input => invoke('dashboard:request', input),
+  focusTask: id => invoke('focus:task', id),
+  dashboard: () => invoke('focus:dashboard'),
+  onRefresh: callback => {
+    const listener = () => callback();
+    ipcRenderer.on('dashboard:refresh', listener);
+    return () => ipcRenderer.removeListener('dashboard:refresh', listener);
+  },
   command: (type, value) => invoke('focus:command', { type, value }),
   settings: changes => invoke('focus:settings', changes),
   connect: (server, code) => invoke('focus:connect', { server, code }),

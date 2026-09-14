@@ -14,13 +14,16 @@ export function usePasscode() {
             // localStorage can be unavailable in private or restricted contexts.
         }
 
-        fetch('/api/auth/session', {
+        const refresh = () => { fetch('/api/auth/session', {
             cache: 'no-store',
             credentials: 'same-origin',
         })
             .then((res) => res.json())
             .then((data) => setIsAuthed(Boolean(data.authenticated)))
-            .catch(() => setIsAuthed(false));
+            .catch(() => setIsAuthed(false)); };
+        refresh();
+        window.addEventListener('hustle-auth-changed', refresh);
+        return () => window.removeEventListener('hustle-auth-changed', refresh);
     }, []);
 
     const verify = useCallback(async (code: string): Promise<boolean> => {
@@ -33,6 +36,7 @@ export function usePasscode() {
 
         if (res?.ok) {
             setIsAuthed(true);
+            window.dispatchEvent(new Event('hustle-auth-changed'));
             return true;
         }
 

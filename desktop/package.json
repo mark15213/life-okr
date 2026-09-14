@@ -1,6 +1,6 @@
 {
   "name": "hustle-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Hustle desktop focus timer",
   "author": "Hustle",
   "private": true,
@@ -9,10 +9,13 @@
     "start": "electron .",
     "test": "node --test tests/*.test.mjs",
     "test:smoke": "node tests/smoke.cjs",
-    "pack": "electron-builder --dir",
-    "dist:win": "electron-builder --win nsis --x64",
-    "dist:zip": "electron-builder --win zip --x64",
-    "dist:mac": "electron-builder --mac dmg --arm64"
+    "pack": "npm run build:web && electron-builder --dir",
+    "dist:win": "npm run build:web && electron-builder --win nsis --x64",
+    "dist:zip": "npm run build:web && electron-builder --win zip --x64",
+    "dist:mac": "npm run build:web && electron-builder --mac dmg --arm64",
+    "build:web": "node ../node_modules/vite/bin/vite.js build --config vite.config.mjs",
+    "prestart": "npm run build:web",
+    "test:dashboard": "node tests/dashboard.cjs"
   },
   "devDependencies": {
     "electron": "^44.3.0",
@@ -22,11 +25,44 @@
   "build": {
     "appId": "com.lifeokr.hustle",
     "productName": "Hustle",
-    "directories": { "output": "release" },
-    "files": ["main.cjs", "preload.cjs", "engine.mjs", "storage.cjs", "renderer/**"],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "engine.mjs",
+      "storage.cjs",
+      "renderer/**",
+      "api.cjs",
+      "web-dist/**",
+      "focus-upload.cjs"
+    ],
     "asar": true,
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
-    "mac": { "target": [{ "target": "dmg", "arch": ["arm64"] }], "category": "public.app-category.productivity" }
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.productivity"
+    }
   }
 }

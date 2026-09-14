@@ -20,7 +20,7 @@
   </section>
   <main id="panel" hidden>
     <header><h1>Hustle.</h1><span class="eyebrow">DESKTOP FOCUS</span><button id="hide-panel" class="quiet close" title="收起，计时继续" aria-label="收起窗口">×</button></header>
-    <nav aria-label="页面"><button data-view="tasks" class="active">任务</button><button data-view="history">历史</button><button data-view="settings">设置</button></nav>
+    <nav aria-label="页面"><button id="open-dashboard">看板</button><button data-view="tasks" class="active">任务</button><button data-view="history">历史</button><button data-view="settings">设置</button></nav>
     <div id="notice" class="notice" hidden><span></span><button id="dismiss-notice" class="quiet" aria-label="关闭提示">×</button></div>
     <section id="tasks-view" class="view">
       <div class="section-heading"><h2>Switch task</h2><button id="sync" class="quiet">刷新任务</button></div>
@@ -36,7 +36,7 @@
     <section id="history-view" class="view" hidden><div class="section-heading"><h2>Focus history</h2><span class="muted">本机记录</span></div><p class="footnote">按轮记录实际专注及任务分配。今日统计使用上海时区。</p><div id="history-list"></div></section>
     <section id="settings-view" class="view" hidden>
       <h2>Preferences</h2>
-      <form id="connection-form" class="settings-group"><h3>连接人生看板</h3><p class="footnote">读取 TickTick 任务，离线时使用缓存。专注记录保存在本机。</p><label>看板地址<input id="server" type="url" placeholder="https://your-dashboard.vercel.app" required></label><label>看板解锁码<input id="code" type="password" autocomplete="off" required></label><button id="connect" class="primary">连接并同步</button><span id="sync-status" class="footnote"></span></form>
+      <form id="connection-form" class="settings-group"><h3>连接人生看板</h3><p class="footnote">共用看板登录与数据。远端任务专注结束后自动同步，本地任务仅保存在本机。</p><label>看板地址<input id="server" type="url" placeholder="https://your-dashboard.vercel.app" required></label><label>看板解锁码<input id="code" type="password" autocomplete="off" required></label><button id="connect" class="primary">连接并同步</button><span id="sync-status" class="footnote"></span></form>
       <div class="settings-group"><h3>番茄与浮标</h3><label class="setting-row">新一轮时长<select id="minutes"><option value="15">15 分钟</option><option value="25">25 分钟</option><option value="30">30 分钟</option><option value="45">45 分钟</option><option value="60">60 分钟</option></select></label><label class="setting-row">浮标始终置顶<input id="topmost" type="checkbox"></label><label class="setting-row">锁定浮标位置<input id="locked" type="checkbox"></label><label class="setting-row">到时提示音<input id="sound" type="checkbox"></label><p id="notification-status" class="footnote">系统通知和提示音受系统勿扰及通知权限控制。</p></div>
       <form id="shortcut-form" class="settings-group"><h3>全局快捷键</h3><p id="shortcut-help" class="footnote"></p><label>打开任务切换器<input id="shortcut-switch" required></label><label>切回上一任务<input id="shortcut-previous" required></label><label>暂停 / 继续<input id="shortcut-pause" required></label><button class="secondary">保存快捷键</button><p id="shortcut-errors" class="error" role="status"></p></form>
       <div class="settings-group"><h3>本地数据</h3><p class="footnote">关闭主窗口会继续计时。锁屏、休眠或从托盘退出会暂停。重启后主动继续；两台设备独立记录。</p><button id="data-folder" class="secondary">打开数据目录</button></div>

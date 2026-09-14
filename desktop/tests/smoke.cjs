@@ -31,6 +31,11 @@ async function waitState(page, predicate) {
     } else { res.statusCode=401; res.end('{}'); }
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const { emptyState } = await import('../engine.mjs');
+  const initial = emptyState();
+  initial.settings.server = `http://127.0.0.1:${server.address().port}`;
+  initial.settings.shortcuts = { switch: 'Control+Alt+Shift+K', previous: 'Control+Alt+Shift+J', pause: 'Control+Alt+Shift+P' };
+  fs.writeFileSync(path.join(profile, 'focus-state.json'), JSON.stringify(initial));
   const env = {...process.env,HUSTLE_TEST_PROFILE:profile};
   const launchOptions = process.env.HUSTLE_EXECUTABLE
     ? { executablePath: process.env.HUSTLE_EXECUTABLE, args: [], env }
@@ -40,7 +45,7 @@ async function waitState(page, predicate) {
     client = await electron.launch(launchOptions);
     let panel, widget;
     for (let i=0;i<40;i++) {
-      panel = client.windows().find(p=>p.url().includes('index.html')&&!p.url().includes('view=widget'));
+      panel = client.windows().find(p=>p.url().includes('/renderer/index.html')&&!p.url().includes('view=widget'));
       widget = client.windows().find(p=>p.url().includes('view=widget'));
       if (panel && widget) break;
       await new Promise(resolve=>setTimeout(resolve,100));
@@ -70,12 +75,12 @@ async function waitState(page, predicate) {
     assert.equal(paused.roundTotals.reduce((n,s)=>n+s.durationMs,0),paused.current.elapsedMs);
     await panel.evaluate(id=>window.hustle.command('select',id),a);
     assert.equal((await panel.evaluate(()=>window.hustle.get())).current.status,'paused');
-    const registered = await client.evaluate(({globalShortcut})=>['Control+Alt+K','Control+Alt+J','Control+Alt+P'].map(k=>globalShortcut.isRegistered(k)));
+    const registered = await client.evaluate(({globalShortcut})=>['Control+Alt+Shift+K','Control+Alt+Shift+J','Control+Alt+Shift+P'].map(k=>globalShortcut.isRegistered(k)));
     assert.deepEqual(registered,[true,true,true]);
     await panel.fill('#search','Project B');
     await panel.press('#search','Enter');
     assert.equal((await panel.evaluate(()=>window.hustle.get())).selectedId,b);
-    await client.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>!w.webContents.getURL().includes('view=widget')).show());
+    await client.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/renderer/index.html')&&!w.webContents.getURL().includes('view=widget')).show());
     await panel.evaluate(()=>window.hustle.command('finish'));
     await panel.click('[data-view=settings]');
     await panel.fill('#server',`http://127.0.0.1:${server.address().port}`);
@@ -99,6 +104,7 @@ async function waitState(page, predicate) {
     const controlBounds = await panel.locator('#toggle').boundingBox();
     const viewportHeight = await panel.evaluate(()=>window.innerHeight);
     assert.ok(controlBounds.y+controlBounds.height<=viewportHeight,'Timer controls stay visible');
+    await panel.bringToFront();
     await panel.screenshot({path:path.join(output,'task-panel.png')});
     await widget.screenshot({path:path.join(output,'widget.png'),omitBackground:true});
     await client.close(); client=null;
