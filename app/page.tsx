@@ -9,7 +9,8 @@ import TokenCard from '@/components/TokenCard';
 import DailyWordBanner from '@/components/DailyWordBanner';
 import FloatingVault from '@/components/FloatingVault';
 import FloatingTasks from '@/components/FloatingTasks';
-import useSWR from 'swr';
+import BackfillModal from '@/components/BackfillModal';
+import useSWR, { useSWRConfig } from 'swr';
 import type { DailyRecord, TokenUsageRow } from '@/lib/db';
 import { withTicktickSummed } from '@/lib/utils';
 import { usePasscode } from '@/lib/usePasscode';
@@ -32,6 +33,7 @@ export default function Home() {
   const fetcher = (url: string) => fetch(url).then(res => res.json());
 
   const { data: todayData, mutate: mutateToday } = useSWR('/api/records/today', fetcher);
+  const { mutate: mutateAll } = useSWRConfig();
   const { data: recordsData, mutate: mutateRecords } = useSWR('/api/records?days=365', fetcher);
   // The vault accumulates over its whole epoch, which will outgrow the 365-row display
   // window, so it gets its own date-bounded query rather than a slice of the charts' data.
@@ -154,8 +156,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#ffffff_48%,#f6f3ee_100%)] relative overflow-hidden font-sans text-zinc-900 selection:bg-zinc-200">
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] mix-blend-multiply pointer-events-none" />
-
       <div className="max-w-[1700px] mx-auto relative z-10 px-5 sm:px-8 lg:px-12 py-10 md:py-16">
         {/* Header */}
         <header className="mb-14 flex flex-col gap-6 border-b border-zinc-200/80 pb-7 sm:flex-row sm:items-end sm:justify-between">
@@ -184,6 +184,8 @@ export default function Home() {
                 Unlocked
               </div>
             )}
+
+            <BackfillModal compact isAuthed={isAuthed} onSuccess={() => void mutateAll(() => true)} />
 
             <Link
               href="/analytics"

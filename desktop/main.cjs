@@ -15,7 +15,8 @@ if (!gotLock) app.quit();
 else boot().catch(error => { console.error(error); app.quit(); });
 
 async function boot() {
-  const { FocusEngine, emptyState, restoreState, totals, statistics } = await import('./engine.mjs');
+  const { FocusEngine, emptyState, restoreState, totals, statistics, SHORTCUT_NAMES } = await import('./engine.mjs');
+  const WIDGET = { width: 300, height: 98 };
   await app.whenReady();
   const appIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png'));
   if (process.platform === 'darwin') app.dock.setIcon(appIcon);
@@ -42,10 +43,10 @@ async function boot() {
 
   const safe = { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true,
     nodeIntegration: false, sandbox: true, backgroundThrottling: false, spellcheck: false };
-  const widget = new BrowserWindow({ width: 272, height: 64, frame: false, transparent: true,
+  const widget = new BrowserWindow({ width: WIDGET.width, height: WIDGET.height, frame: false, transparent: true,
     resizable: false, maximizable: false, fullscreenable: false, show: false, skipTaskbar: true,
     alwaysOnTop: engine.state.settings.topmost, hasShadow: false, webPreferences: safe });
-  const panel = new BrowserWindow({ width: 490, height: 740, minWidth: 420, minHeight: 620,
+  const panel = new BrowserWindow({ width: 440, height: 620, minWidth: 400, minHeight: 540,
     title: 'Hustle · Focus', icon: appIcon, backgroundColor: '#ffffff', show: false, autoHideMenuBar: true,
     webPreferences: safe });
   const dashboard = new BrowserWindow({ width: 1280, height: 900, minWidth: 800, minHeight: 600, title: 'Hustle', icon: appIcon, show: false, autoHideMenuBar: true, webPreferences: safe });
@@ -72,12 +73,12 @@ async function boot() {
 
   function clampPosition(position) {
     const area = screen.getDisplayNearestPoint({ x: Math.round(position.x), y: Math.round(position.y) }).workArea;
-    return { x: Math.round(Math.max(area.x, Math.min(position.x, area.x + area.width - 272))),
-      y: Math.round(Math.max(area.y, Math.min(position.y, area.y + area.height - 64))) };
+    return { x: Math.round(Math.max(area.x, Math.min(position.x, area.x + area.width - WIDGET.width))),
+      y: Math.round(Math.max(area.y, Math.min(position.y, area.y + area.height - WIDGET.height))) };
   }
   const area = screen.getPrimaryDisplay().workArea;
   const stored = engine.state.settings.position;
-  const initial = stored && Number.isFinite(stored.x) && Number.isFinite(stored.y) ? stored : { x: area.x + area.width - 300, y: area.y + 32 };
+  const initial = stored && Number.isFinite(stored.x) && Number.isFinite(stored.y) ? stored : { x: area.x + area.width - WIDGET.width - 28, y: area.y + 32 };
   widget.setPosition(...Object.values(clampPosition(initial)));
   widget.setMovable(!engine.state.settings.locked);
   if (process.platform === 'darwin') widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -89,7 +90,7 @@ async function boot() {
       const next = clampPosition({ x, y });
       const area = screen.getDisplayNearestPoint(next).workArea;
       if (Math.abs(next.x - area.x) < 20) next.x = area.x;
-      if (Math.abs(next.x + 272 - area.x - area.width) < 20) next.x = area.x + area.width - 272;
+      if (Math.abs(next.x + WIDGET.width - area.x - area.width) < 20) next.x = area.x + area.width - WIDGET.width;
       if (x !== next.x || y !== next.y) widget.setPosition(next.x, next.y);
       engine.state.settings.position = next; persist();
     }, 250);
@@ -102,7 +103,7 @@ async function boot() {
   screen.on('display-metrics-changed', relocate);
 
   function snapshot() {
-    return { ...engine.state, roundTotals: totals(engine.state.current),
+    return { ...engine.state, roundTotals: totals(engine.state.current), queue: engine.queue(),
       stats: statistics(engine.state), notice, shortcutErrors, syncing,
       notificationsSupported: Notification.isSupported(), platform: process.platform };
   }
@@ -152,7 +153,8 @@ async function boot() {
   function registerShortcuts() {
     globalShortcut.unregisterAll(); shortcutErrors = [];
     const callbacks = { switch: () => panel.isVisible() && panel.isFocused() ? panel.hide() : openPanel(),
-      previous: () => action(() => engine.previous()), pause: () => action(() => engine.toggle()) };
+      previous: () => action(() => engine.previous()), pause: () => action(() => engine.toggle()),
+      next: () => action(() => engine.next()), complete: () => void completeTask().catch(error => { notice = error.message; broadcast(); }) };
     for (const [name, callback] of Object.entries(callbacks)) {
       const key = engine.state.settings.shortcuts[name];
       try { if (!globalShortcut.register(key, callback)) shortcutErrors.push(`${key} 已被占用，请在设置中改绑`); }
@@ -174,6 +176,8 @@ async function boot() {
       { label: '打开任务切换器', click: () => openPanel() },
       { label: widget.isVisible() ? '隐藏浮标' : '显示浮标', click: () => { if (widget.isVisible()) widget.hide(); else widget.showInactive(); refreshMenu(); } },
       { label: engine.state.current?.status === 'running' ? '暂停番茄' : '开始 / 继续', click: () => action(() => engine.toggle()) },
+      { label: '下一个任务', click: () => action(() => engine.next()) },
+      { label: '完成当前任务', click: () => void completeTask().catch(error => { notice = error.message; broadcast(); }) },
       { label: '始终置顶', type: 'checkbox', checked: settings.topmost, click: item => action(() => { settings.topmost = item.checked; widget.setAlwaysOnTop(item.checked); }) },
       { label: '锁定位置', type: 'checkbox', checked: settings.locked, click: item => action(() => { settings.locked = item.checked; widget.setMovable(!item.checked); }) },
       { label: '历史记录', click: () => openPanel('history') },
@@ -222,7 +226,23 @@ async function boot() {
     update(); return snapshot();
   });
   handle('focus:hide', () => panel.hide());
-  handle('focus:command', ({ type, value } = {}) => {
+  // A TickTick task is closed on the server first; only then does it leave the local queue,
+  // so a failed request never makes a task vanish here while it stays open in the cloud.
+  async function completeTask(id = engine.state.selectedId) {
+    pulse();
+    const task = engine.task(id);
+    if (!task) throw new Error('先选择一个任务');
+    if (task.source === 'ticktick') {
+      if (!engine.state.settings.server) throw new Error('请先在设置中连接看板');
+      await request(serverURL(engine.state.settings.server), `/api/ticktick/tasks/${encodeURIComponent(task.externalId)}/complete`, { method: 'POST' });
+    }
+    pulse(); engine.complete(id);
+    notice = `已完成「${task.title.slice(0, 40)}」${engine.task() ? ` · 切到「${engine.task().title.slice(0, 40)}」` : ''}`;
+    update();
+    if (task.source === 'ticktick') dashboard.webContents.send('dashboard:refresh');
+    return snapshot();
+  }
+  handle('focus:command', async ({ type, value } = {}) => {
     pulse();
     switch (type) {
       case 'select': engine.select(value); break;
@@ -230,7 +250,10 @@ async function boot() {
       case 'toggle': engine.toggle(); break;
       case 'finish': engine.finish(); break;
       case 'previous': engine.previous(); break;
-      case 'add': engine.addTask(value); break;
+      case 'next': engine.next(); break;
+      case 'move': engine.move(value?.id, value?.index); break;
+      case 'add': typeof value === 'string' ? engine.addTask(value) : engine.addTask(value?.title, value?.list); break;
+      case 'complete': return completeTask(typeof value === 'string' ? value : undefined);
       case 'dismiss': notice = ''; break;
       default: throw new Error('未知操作');
     }
@@ -248,10 +271,10 @@ async function boot() {
     if (changes.shortcuts) {
       const entries = Object.entries(changes.shortcuts);
       for (const [name, value] of entries) {
-        if (!['switch','previous','pause'].includes(name) || typeof value !== 'string' || !/^(Control|Command|Alt|Shift)(\+(Control|Command|Alt|Shift))*\+[A-Z0-9]$/.test(value)) throw new Error('快捷键格式示例：Control+Alt+K');
+        if (!SHORTCUT_NAMES.includes(name) || typeof value !== 'string' || !/^(Control|Command|Alt|Shift)(\+(Control|Command|Alt|Shift))*\+[A-Z0-9]$/.test(value)) throw new Error('快捷键格式示例：Control+Alt+K');
       }
       const next = { ...s.shortcuts, ...changes.shortcuts };
-      if (new Set(Object.values(next)).size !== 3) throw new Error('三个快捷键不能相同');
+      if (new Set(Object.values(next)).size !== SHORTCUT_NAMES.length) throw new Error('快捷键不能重复');
       s.shortcuts = next; registerShortcuts();
     }
     widget.setAlwaysOnTop(s.topmost); widget.setMovable(!s.locked); update(); return snapshot();
@@ -268,7 +291,8 @@ async function boot() {
     const body = await request(server, '/api/ticktick/tasks');
     pulse();
     const removed = engine.syncTasks(body.tasks, server);
-    notice = removed ? '当前任务已完成或移除，番茄已暂停。请选择任务后继续。' : '任务已同步，可离线使用。';
+    // A routine sync succeeding is the expected case, so it no longer announces itself.
+    if (removed) notice = '当前任务已完成或移除，番茄已暂停。请选择任务后继续。';
   }
   handle('focus:connect', async ({ server, code } = {}) => {
     if (syncing) throw new Error('正在同步，请稍候');

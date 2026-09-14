@@ -93,12 +93,11 @@ button,input {
 
 #widget {
   padding:8px;
-  width:272px;
-  height:64px;
+  width:300px;
   user-select:none}
 .pill {
   height:48px;
-  width:256px;
+  width:284px;
   display:flex;
   align-items:center;
   background:#18181b;
@@ -176,10 +175,44 @@ button,input {
   padding:26px 26px 16px}
 header {
   display:flex;
-  align-items:baseline;
-  gap:17px;
-  padding-bottom:19px;
+  align-items:center;
+  gap:12px;
+  padding-bottom:16px;
+  margin-bottom:16px;
   border-bottom:1px solid #e4e4e7}
+.header-tools {
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:2px}
+.tool {
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  color:#a1a1aa}
+.tool:hover,.tool.active {
+  color:#18181b;
+  background:#f0f0f2}
+.tool svg {
+  width:16px;
+  height:16px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round}
+.tool.close {
+  font-size:22px;
+  margin-left:4px}
+.back {
+  font-size:12px;
+  padding-left:0}
+.button-row {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap}
 h1 {
   font-family:"Old Standard TT",Georgia,"Times New Roman",serif;
   font-weight:700;
@@ -187,25 +220,6 @@ h1 {
   letter-spacing:-2px;
   line-height:1;
   margin:0}
-.eyebrow {
-  font-size:9px;
-  letter-spacing:2px;
-  color:#a1a1aa}
-.close {
-  margin-left:auto;
-  font-size:23px}
-nav {
-  display:flex;
-  gap:23px;
-  margin:9px 0 22px}
-nav button {
-  padding:12px 0 9px;
-  color:#a1a1aa;
-  border-bottom:2px solid transparent;
-  font-weight:600}
-nav button.active {
-  color:#18181b;
-  border-color:#18181b}
 h2 {
   font-size:20px;
   letter-spacing:-.5px;
@@ -216,8 +230,10 @@ h3 {
 .section-heading {
   display:flex;
   align-items:center;
-  justify-content:space-between;
-  margin:0 0 20px}
+  gap:12px;
+  margin:0 0 18px}
+.section-heading h2 {
+  font-size:16px}
 .search {
   display:flex;
   align-items:center;
@@ -242,13 +258,15 @@ h3 {
 .summary {
   display:flex;
   justify-content:space-between;
+  align-items:center;
   gap:10px;
-  color:#a1a1aa;
-  font-size:10px;
-  margin:22px 0 11px;
+  color:#71717a;
+  font-size:11px;
+  margin:16px 0 6px;
   font-variant-numeric:tabular-nums}
-.summary span:first-child {
-  color:#71717a}
+.summary .quiet {
+  font-size:11px;
+  padding:4px 0}
 #task-list {
   overflow-y:auto;
   flex:1;
@@ -257,13 +275,15 @@ h3 {
   display:none}
 .task-row {
   width:100%;
-  padding:14px 11px;
+  padding:14px 11px 14px 6px;
   border-radius:12px;
   display:flex;
   align-items:center;
-  gap:11px;
+  gap:9px;
   text-align:left;
-  margin:2px 0}
+  margin:2px 0;
+  cursor:pointer;
+  position:relative}
 .task-row:hover,.task-row.highlighted {
   background:#f0f0f2}
 .task-row[aria-selected=true] {
@@ -311,18 +331,15 @@ h3 {
   padding-top:12px}
 .add-form input {
   flex:1;
+  min-width:90px;
   border:0;
   background:none;
   font-size:12px;
   padding:9px 0}
-.add-form button {
+.add-form button[type=submit] {
   font-size:22px}
-.keyboard-hints {
-  display:flex;
-  justify-content:space-between;
-  font-size:10px;
-  color:#a1a1aa;
-  padding:15px 0}
+.add-form input:focus-visible {
+  outline:none}
 kbd {
   font-family:inherit;
   border:1px solid #e4e4e7;
@@ -452,7 +469,7 @@ kbd {
   display:flex;
   flex-direction:column;
   overflow:hidden}
-#tasks-view>*:not(#task-list):not(.empty),header,nav,.notice {
+#tasks-view>*:not(#task-list):not(.empty),header,.notice {
   flex-shrink:0}
 * {
   scrollbar-width:thin;
@@ -461,13 +478,10 @@ kbd {
 #panel {
   padding:20px 22px 12px}
 header {
-  padding-bottom:14px}
+  padding-bottom:12px;
+  margin-bottom:12px}
 h1 {
   font-size:34px}
-nav {
-  margin:4px 0 14px}
-nav button {
-  padding:9px 0 7px}
 .section-heading {
   margin-bottom:14px}
 .summary {
@@ -477,8 +491,6 @@ nav button {
 .add-form {
   margin-top:10px;
   padding-top:8px}
-.keyboard-hints {
-  padding:11px 0}
 .round-controls {
   padding-top:14px}
 .footnote {
@@ -486,3 +498,235 @@ nav button {
 .notice {
   margin-bottom:12px;
   padding:8px 10px}
+
+/* ---- queue: drag handle, drop marks, complete ---- */
+.grip {
+  color:#d4d4d8;
+  font-size:11px;
+  letter-spacing:-3px;
+  width:12px;
+  cursor:grab;
+  flex-shrink:0;
+  opacity:0;
+  transition:opacity .15s}
+.task-row:hover .grip,.task-row.highlighted .grip {
+  opacity:1}
+.task-row[draggable=false] .grip {
+  visibility:hidden}
+.task-row.dragging {
+  opacity:.35}
+.task-row.drop-before::before,.task-row.drop-after::after {
+  content:"";
+  position:absolute;
+  left:8px;
+  right:8px;
+  height:2px;
+  border-radius:2px;
+  background:#18181b}
+.task-row.drop-before::before {
+  top:-2px}
+.task-row.drop-after::after {
+  bottom:-2px}
+.row-done {
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:#a1a1aa;
+  flex-shrink:0;
+  opacity:0;
+  transform:scale(.8);
+  transition:opacity .15s,transform .15s,background .15s,color .15s}
+.task-row:hover .row-done,.task-row.highlighted .row-done,.row-done:focus-visible {
+  opacity:1;
+  transform:scale(1)}
+.row-done:hover {
+  background:#18181b;
+  color:#fff}
+.row-done svg,.done-button svg,.icon-button.done svg {
+  width:14px;
+  height:14px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.4;
+  stroke-linecap:round;
+  stroke-linejoin:round}
+.done-button {
+  display:inline-flex;
+  align-items:center;
+  gap:6px}
+.done-button:hover:not(:disabled) {
+  background:#18181b;
+  color:#fff;
+  border-color:#18181b}
+.summary-hint {
+  flex:1;
+  text-align:right;
+  color:#c4c4c8;
+  font-size:10px}
+.list-picker {
+  display:flex;
+  gap:2px;
+  flex-shrink:0;
+  margin-right:6px}
+/* Four small dots; only the chosen one spells out its name. */
+.list-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:0;
+  height:22px;
+  padding:0 5px;
+  border-radius:11px;
+  font-size:10px;
+  line-height:1;
+  color:#52525b;
+  border:1px solid transparent;
+  transition:all .18s cubic-bezier(.2,.8,.2,1)}
+.list-chip:hover {
+  background:#f4f4f5}
+.list-chip.is-on {
+  gap:5px;
+  padding:0 8px 0 6px;
+  color:#18181b;
+  border-color:#e4e4e7;
+  background:#fff}
+.list-chip .dot {
+  width:7px;
+  height:7px}
+.list-chip .label {
+  display:none}
+.list-chip.is-on .label {
+  display:inline}
+
+/* ---- switch animation ---- */
+.task-swap,#current-label {
+  position:relative;
+  display:block;
+  overflow:hidden}
+.task-swap>span,#current-label>span {
+  display:block;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis}
+.task-swap>span.leaving,#current-label>span.leaving {
+  position:absolute;
+  inset:0;
+  animation:swap-out .32s cubic-bezier(.4,0,.2,1) forwards}
+.task-swap>span.entering,#current-label>span.entering {
+  animation:swap-in .38s cubic-bezier(.2,.8,.2,1)}
+@keyframes swap-out {
+  to {
+    transform:translateY(-110%);
+    opacity:0;
+    filter:blur(2px)}}
+@keyframes swap-in {
+  from {
+    transform:translateY(110%);
+    opacity:0;
+    filter:blur(2px)}}
+.pill.ring {
+  animation:ring .7s ease-out}
+@keyframes ring {
+  0% {
+    box-shadow:0 3px 7px #0002,0 0 0 0 var(--ring,#fff)}
+  60% {
+    box-shadow:0 3px 7px #0002,0 0 0 7px transparent}
+  100% {
+    box-shadow:0 3px 7px #0002}}
+.task-row.pulse {
+  animation:pulse .6s ease-out}
+@keyframes pulse {
+  0% {
+    background:#e4e4e7}
+  100% {
+    background:#f4f4f5}}
+.task-row.arrived {
+  animation:arrive .32s cubic-bezier(.2,.8,.2,1)}
+@keyframes arrive {
+  from {
+    opacity:0;
+    transform:translateY(-8px)}}
+.task-row.leaving-done {
+  transition:opacity .26s,transform .26s;
+  opacity:0;
+  transform:translateX(24px)}
+.task-row.leaving-done .row-done {
+  opacity:1;
+  transform:scale(1);
+  background:#16a34a;
+  color:#fff}
+
+/* ---- pill: complete button + always-on queue strip ---- */
+.icon-button.done {
+  width:28px;
+  margin-left:0;
+  color:#a1a1aa}
+.icon-button.done:hover:not(:disabled) {
+  color:#4ade80}
+.widget-queue {
+  margin:5px 10px 0;
+  height:26px;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  padding:0 6px;
+  border-radius:13px;
+  background:#18181be6;
+  border:1px solid #27272a;
+  box-shadow:0 2px 6px #0002;
+  overflow:hidden;
+  -webkit-app-region:drag}
+.widget-queue-chip {
+  flex:1 1 0;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:5px;
+  height:20px;
+  padding:0 7px;
+  border-radius:10px;
+  color:#a1a1aa;
+  font-size:10.5px;
+  text-align:left;
+  animation:arrive .28s cubic-bezier(.2,.8,.2,1) both;
+  animation-delay:calc(var(--i,0)*40ms);
+  transition:background .15s,color .15s}
+.widget-queue-chip:first-child {
+  color:#e4e4e7}
+.widget-queue-chip:hover {
+  background:#ffffff14;
+  color:#fff}
+.widget-queue-chip .dot {
+  width:5px;
+  height:5px}
+.widget-queue-chip span {
+  overflow:hidden;
+  white-space:nowrap;
+  text-overflow:ellipsis}
+.widget-queue-empty {
+  color:#71717a;
+  font-size:10px;
+  padding:0 8px}
+@media(prefers-reduced-motion:reduce) {
+  .task-swap>span,#current-label>span,.pill,.task-row,.widget-queue,.widget-queue-chip {
+    animation:none!important;
+    transition:none!important}}
+#current-label>span {
+  margin:0;
+  max-width:none}
+
+/* ---- marquee for text that does not fit ---- */
+.marquee {
+  text-overflow:clip!important;
+  animation:marquee var(--marquee-duration,6s) ease-in-out infinite!important;
+  will-change:transform}
+@keyframes marquee {
+  0%,18% {
+    transform:translateX(0)}
+  55%,72% {
+    transform:translateX(var(--shift,0))}
+  100% {
+    transform:translateX(0)}}
+.widget-task:hover .marquee,.widget-queue-chip:hover .marquee {
+  animation-play-state:paused}

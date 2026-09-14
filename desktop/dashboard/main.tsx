@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client';
 import { SWRConfig, useSWRConfig } from 'swr';
 import Home from '../../app/page';
 import Analytics from '../../app/analytics/page';
-import BackfillModal from '../../components/BackfillModal';
 import type { DesktopBridge } from '../../lib/useDesktopFocus';
 import './styles.css';
 
@@ -34,32 +33,25 @@ window.fetch = async (input, init) => {
 
 function Dashboard() {
   const [route, setRoute] = useState(location.hash.slice(1) || '/');
-  const [server, setServer] = useState('');
-  const [shortcut, setShortcut] = useState('Control+Alt+K');
   const [error, setError] = useState('');
   const { mutate } = useSWRConfig();
   const refresh = () => { setError(''); void mutate(() => true); };
   useEffect(() => {
     const change = () => { setRoute(location.hash.slice(1) || '/'); window.scrollTo(0, 0); };
     const failure = (event: Event) => setError((event as CustomEvent<string>).detail);
-    const update = (state: Awaited<ReturnType<DesktopBridge['get']>>) => { setServer(state.settings.server); setShortcut(state.settings.shortcuts.switch.replaceAll('Control', state.platform === 'darwin' ? 'Control' : 'Ctrl').replaceAll('Alt', state.platform === 'darwin' ? 'Option' : 'Alt')); };
     window.addEventListener('hashchange', change);
     window.addEventListener(networkEvent, failure);
-    const unsubscribe = bridge.onState(update);
     const unrefresh = bridge.onRefresh(() => { window.dispatchEvent(new Event('hustle-auth-changed')); void mutate(() => true); });
-    void bridge.get().then(update);
-    return () => { window.removeEventListener('hashchange', change); window.removeEventListener(networkEvent, failure); unsubscribe(); unrefresh(); };
+    return () => { window.removeEventListener('hashchange', change); window.removeEventListener(networkEvent, failure); unrefresh(); };
   }, [mutate]);
+  // A failed request shows one quiet line and takes itself away; the page already refreshes on focus.
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(''), 8000);
+    return () => clearTimeout(timer);
+  }, [error]);
   return <>
-    <div className="desktop-bar">
-      <a href="#/" aria-current={route === '/' ? 'page' : undefined}>今日看板</a>
-      <a href="#/analytics" aria-current={route === '/analytics' ? 'page' : undefined}>趋势与统计</a>
-      <BackfillModal onSuccess={refresh} />
-      <button onClick={() => void bridge.open()}>任务与番茄 <kbd>{shortcut}</kbd></button>
-      <span className="desktop-origin" title={server}>{server.replace('https://', '')}</span>
-      <button onClick={refresh}>刷新</button>
-    </div>
-    {error && <div className="desktop-network" role="alert"><span>{error}</span><button onClick={refresh}>重试</button><button onClick={() => setError('')}>关闭</button></div>}
+    {error && <div className="desktop-network" role="status"><span>{error}</span><button onClick={refresh}>重试</button></div>}
     {route === '/analytics' ? <Analytics /> : <Home />}
   </>;
 }

@@ -4,13 +4,18 @@ const api = window.hustle;
 const isWidget = new URLSearchParams(location.search).get('view') === 'widget';
 const pauseIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
 const playIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>';
+const doneIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>';
+const SHORTCUTS = ['switch', 'previous', 'pause', 'next', 'complete'];
+const LISTS = ['work', 'study', 'hustle', 'life'];
 let state, view = 'tasks', highlight = 0, filtered = [], taskSignature = '', historySignature = '';
-let errorTimeout, settingsLoaded = false;
+let errorTimeout, settingsLoaded = false, newList = 'work';
+let lastTaskId, dragId = null, dropIndex = null;
 const clock = (ms, ceil = false) => {
   const seconds = Math.max(0, (ceil ? Math.ceil : Math.floor)(ms / 1000));
   return `${String(Math.floor(seconds / 60)).padStart(2,'0')}:${String(seconds % 60).padStart(2,'0')}`;
 };
-const category = list => ['work','study','hustle','life'].includes(list) ? list : 'inbox';
+const category = list => [...LISTS, 'inbox'].includes(list) ? list : 'inbox';
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -33,7 +38,7 @@ function setView(next) {
   if (isWidget) return;
   view = ['tasks','history','settings'].includes(next) ? next : 'tasks';
   document.querySelectorAll('.view').forEach(node => { node.hidden = node.id !== `${view}-view`; });
-  document.querySelectorAll('nav button').forEach(node => node.classList.toggle('active', node.dataset.view === view));
+  document.querySelectorAll('.header-tools [data-view]').forEach(node => node.classList.toggle('active', node.dataset.view === view));
   if (view === 'settings') fillSettings();
   if (view === 'tasks') { $('search').focus(); $('search').select(); }
   if (state) render(state);
@@ -44,9 +49,46 @@ function fillSettings() {
   $('server').value = s.server || '';
   $('minutes').value = s.minutes;
   for (const key of ['topmost','locked','sound']) $(key).checked = s[key];
-  for (const key of ['switch','previous','pause']) $(`shortcut-${key}`).value = s.shortcuts[key];
+  for (const key of SHORTCUTS) $(`shortcut-${key}`).value = s.shortcuts[key] || '';
   $('shortcut-help').textContent = state.platform === 'darwin' ? 'Mac：Control = ⌃，Alt = Option（⌥），不是 Command。可在其他应用中使用。' : '可在其他应用中使用。格式示例：Control+Alt+K。';
   settingsLoaded = true;
+}
+
+/* Switching tasks is the one moment worth a flourish: the old name lifts out, the new one
+   rises in, and the pill rings once in the new task's colour. */
+function swapTaskName(container, title, list) {
+  const current = container.querySelector('span:last-child');
+  if (current && current.textContent === title) return;
+  const incoming = el('span', '', title);
+  if (!current || reduceMotion) { container.replaceChildren(incoming); return; }
+  current.classList.add('leaving');
+  incoming.classList.add('entering');
+  container.append(incoming);
+  const clean = () => { current.remove(); incoming.classList.remove('entering'); if (isWidget) marquee(incoming); };
+  incoming.addEventListener('animationend', clean, { once: true });
+  setTimeout(clean, 500);
+  if (isWidget) {
+    const pill = $('pill');
+    pill.style.setProperty('--ring', getComputedStyle(container.previousElementSibling).backgroundColor);
+    pill.classList.remove('ring'); void pill.offsetWidth; pill.classList.add('ring');
+  }
+}
+
+/* Text that does not fit gets a slow back-and-forth scroll instead of an ellipsis. Measured
+   after layout, so it is re-checked every render and drops the scroll once the text fits. */
+function marquee(node) {
+  if (!node) return;
+  const overflow = node.scrollWidth - node.clientWidth;
+  if (overflow > 2 && !reduceMotion) {
+    if (node.dataset.shift !== String(overflow)) {
+      node.dataset.shift = String(overflow);
+      node.style.setProperty('--shift', `-${overflow}px`);
+      node.style.setProperty('--marquee-duration', `${Math.max(4, 3 + overflow / 25)}s`);
+      node.classList.remove('marquee'); void node.offsetWidth; node.classList.add('marquee');
+    }
+  } else if (node.classList.contains('marquee')) {
+    node.classList.remove('marquee'); delete node.dataset.shift;
+  }
 }
 function render(next) {
   state = next;
@@ -58,15 +100,23 @@ function render(next) {
   if (isWidget) {
     $('widget-clock').textContent = completed ? '已完成' : clock(remaining, true);
     $('widget-clock').title = round ? `本轮已专注 ${clock(round.elapsedMs)} / ${clock(round.durationMs)}${running ? '' : ' · 已暂停'}` : '查看任务与本轮记录';
-    $('widget-task').querySelector('span').textContent = task?.title || '选择任务';
     $('widget-task').querySelector('i').className = `dot ${category(task?.list)}`;
-    $('widget-task').title = `${task?.title || '选择任务'} · 点击切换${state.notice ? `\n${state.notice}` : ''}`;
+    swapTaskName($('widget-task').querySelector('.task-swap'), task?.title || '选择任务', task?.list);
+    $('widget-task').title = `${task?.title || '选择任务'} · 点击打开切换器${state.notice ? `\n${state.notice}` : ''}`;
+    $('widget-done').disabled = !task;
+    $('widget-done').title = task ? `完成「${task.title}」，切到下一个 (${state.settings.shortcuts.complete})` : '先选择一个任务';
     $('widget-toggle').innerHTML = running ? pauseIcon : playIcon;
     $('widget-toggle').setAttribute('aria-label', running ? '暂停番茄' : round ? '继续番茄' : '开始番茄');
     $('widget-toggle').title = running ? '暂停番茄' : round ? '继续番茄' : '开始番茄';
     $('pill').classList.toggle('paused', Boolean(round && !running));
     $('pill').classList.toggle('complete', completed);
     $('pill').classList.toggle('locked', state.settings.locked);
+    renderWidgetQueue();
+    requestAnimationFrame(() => {
+      marquee($('widget-task').querySelector('.task-swap>span:not(.leaving):not(.entering)'));
+      $('widget-queue').querySelectorAll('.widget-queue-chip>span').forEach(marquee);
+    });
+    lastTaskId = task?.id;
     return;
   }
   if (!settingsLoaded) fillSettings();
@@ -75,9 +125,11 @@ function render(next) {
   $('notice').querySelector('span').textContent = state.notice;
   $('round-summary').textContent = round ? `${running ? '本轮已专注' : '已暂停'} ${clock(round.elapsedMs)} / ${clock(round.durationMs)}` : completed ? '上一轮已完成，可开始下一轮' : '选择任务，开始一轮专注';
   $('panel-clock').textContent = clock(remaining, true);
-  $('current-label').textContent = task?.title || '先选择一个任务';
+  swapTaskName($('current-label'), task?.title || '先选择一个任务');
   $('toggle').textContent = running ? '暂停' : round ? '继续专注' : '开始专注';
   $('toggle').disabled = !task;
+  $('complete').disabled = !task;
+  $('complete').title = task ? `完成「${task.title}」，切到下一个 (${state.settings.shortcuts.complete})` : '先选择一个任务';
   $('finish').hidden = !round;
   $('sync').disabled = state.syncing || !state.settings.server;
   $('sync').textContent = state.syncing ? '同步中…' : '刷新任务';
@@ -88,37 +140,81 @@ function render(next) {
   $('notification-status').textContent = state.notificationsSupported ? '系统通知和提示音受系统勿扰及通知权限控制。' : '当前系统不支持通知，完成状态仍会显示在浮标。';
   if (view === 'tasks') renderTasks();
   if (view === 'history') renderHistory();
+  lastTaskId = task?.id;
 }
+
+/* A slim strip under the pill: the next three in the queue, always there, one click to switch. */
+function renderWidgetQueue() {
+  const list = $('widget-queue');
+  const queue = state.queue || [];
+  const signature = JSON.stringify(queue.map(t => [t.id, t.title, t.list]));
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  const fragment = document.createDocumentFragment();
+  if (!queue.length) fragment.append(el('span', 'widget-queue-empty', state.tasks.length ? '队列已空' : '还没有任务'));
+  queue.forEach((task, index) => {
+    const chip = el('button', 'widget-queue-chip');
+    chip.setAttribute('role', 'option');
+    chip.style.setProperty('--i', index);
+    chip.append(el('i', `dot ${category(task.list)}`), el('span', '', task.title));
+    chip.title = `${index === 0 ? '下一个' : `第 ${index + 1} 个`}：${task.title}\n点击切换`;
+    chip.onclick = e => { e.stopPropagation(); void command('select', task.id); };
+    fragment.append(chip);
+  });
+  list.replaceChildren(fragment);
+}
+
+/* Rows keep their identity across renders so a reorder can be animated with FLIP:
+   measure where each row was, rebuild, measure again, and play the difference. */
 function renderTasks() {
   const search = $('search').value.trim().toLocaleLowerCase();
-  filtered = state.tasks.filter(t => t.title.toLocaleLowerCase().includes(search)).sort((a,b) => {
-    const rank = t => t.id === state.selectedId ? -1 : state.recent.includes(t.id) ? state.recent.indexOf(t.id) : 999;
-    return rank(a)-rank(b);
-  });
+  filtered = state.tasks.filter(t => t.title.toLocaleLowerCase().includes(search));
   highlight = Math.max(0, Math.min(highlight, filtered.length-1));
   const signature = JSON.stringify([filtered.map(t => [t.id,t.title,t.list]), state.selectedId]);
+  const listNode = $('task-list');
   if (signature !== taskSignature) {
     taskSignature = signature;
+    const before = new Map(Array.from(listNode.children, row => [row.dataset.id, row.getBoundingClientRect().top]));
     const fragment = document.createDocumentFragment();
     filtered.forEach((task,index) => {
-      const row = el('button','task-row');
+      const row = el('div','task-row');
       row.dataset.id = task.id;
       row.id = `task-option-${index}`;
       row.setAttribute('role','option');
       row.setAttribute('aria-selected', String(task.id === state.selectedId));
+      row.tabIndex = -1;
+      row.draggable = !search;
+      row.append(el('span','grip','⋮⋮'));
       row.append(el('i', `dot ${category(task.list)}`));
       const name = el('span','task-name');
       name.append(el('span','task-title',task.title),el('span','task-meta'));
       row.append(name,el('span','task-time'));
       if (task.id === state.selectedId) row.append(el('span','current-badge','当前'));
+      const done = el('button','row-done');
+      done.innerHTML = doneIcon; done.title = `完成「${task.title}」`; done.setAttribute('aria-label', `完成 ${task.title}`);
+      done.onclick = e => { e.stopPropagation(); void completeRow(row, task.id); };
+      row.append(done);
       row.title = task.title;
       row.addEventListener('click', () => choose(task.id));
+      row.addEventListener('dragstart', e => { dragId = task.id; row.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', task.id); });
+      row.addEventListener('dragend', () => { dragId = null; row.classList.remove('dragging'); clearDropMarks(); });
       fragment.append(row);
     });
-    $('task-list').replaceChildren(fragment);
+    listNode.replaceChildren(fragment);
+    if (before.size && !reduceMotion) {
+      for (const row of listNode.children) {
+        const was = before.get(row.dataset.id);
+        if (was === undefined) { row.classList.add('arrived'); continue; }
+        const delta = was - row.getBoundingClientRect().top;
+        if (Math.abs(delta) < 1) continue;
+        row.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration: 320, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      }
+      const current = listNode.querySelector('[aria-selected=true]');
+      if (current && state.selectedId !== lastTaskId) { current.classList.remove('pulse'); void current.offsetWidth; current.classList.add('pulse'); }
+    }
   }
   const totals = new Map(state.roundTotals.map(t => [t.taskId,t.durationMs]));
-  Array.from($('task-list').children).forEach((row,index) => {
+  Array.from(listNode.children).forEach((row,index) => {
     const id = row.dataset.id;
     row.classList.toggle('highlighted', index === highlight);
     row.querySelector('.task-time').textContent = clock(totals.get(id) || 0);
@@ -128,6 +224,17 @@ function renderTasks() {
   $('empty').hidden = filtered.length > 0;
   $('empty').querySelector('strong').textContent = state.tasks.length ? '没有匹配的任务' : '从一个任务开始。';
   $('empty').querySelector('p').textContent = state.tasks.length ? '换个关键词，或添加一个本地任务。' : '创建本地任务，或在设置中连接看板，读取 TickTick 任务。';
+}
+function clearDropMarks() {
+  dropIndex = null;
+  $('task-list').querySelectorAll('.drop-before,.drop-after').forEach(n => n.classList.remove('drop-before','drop-after'));
+}
+async function completeRow(row, id) {
+  if (!reduceMotion) {
+    row.classList.add('leaving-done');
+    await new Promise(resolve => setTimeout(resolve, 260));
+  }
+  await command('complete', id);
 }
 async function choose(id) {
   const result = await command('select',id);
@@ -163,18 +270,47 @@ $(isWidget ? 'widget' : 'panel').hidden = false;
 if (isWidget) {
   $('widget-clock').onclick = $('widget-task').onclick = () => run(() => api.open());
   $('widget-toggle').onclick = () => state.tasks.some(t=>t.id===state.selectedId) ? command('toggle') : run(() => api.open());
+  $('widget-done').onclick = () => command('complete');
 } else {
   $('hide-panel').onclick = () => run(() => api.hide());
   $('dismiss-notice').onclick = () => command('dismiss');
-  document.querySelectorAll('nav button').forEach(node => { node.onclick = () => setView(node.dataset.view); });
+  document.querySelectorAll('[data-view]').forEach(node => { node.onclick = () => setView(node.dataset.view === view ? 'tasks' : node.dataset.view); });
   $('search').oninput = () => { highlight=0; renderTasks(); };
   $('toggle').onclick = () => command('toggle');
   $('finish').onclick = () => command('finish');
+  $('complete').onclick = () => command('complete');
   $('sync').onclick = () => run(() => api.sync());
+  document.querySelectorAll('.list-chip').forEach(chip => {
+    chip.onclick = () => {
+      newList = chip.dataset.list;
+      document.querySelectorAll('.list-chip').forEach(c => { const on = c === chip; c.classList.toggle('is-on', on); c.setAttribute('aria-pressed', String(on)); });
+      $('new-task').focus();
+    };
+  });
   $('add-form').onsubmit = async e => {
     e.preventDefault();
-    if (await command('add',$('new-task').value)) { $('new-task').value=''; $('search').value=''; renderTasks(); }
+    if (await command('add', { title: $('new-task').value, list: newList })) { $('new-task').value=''; $('search').value=''; renderTasks(); }
   };
+  // Drag a row to change its place in the queue. The drop marker follows the pointer's half of the row.
+  const listNode = $('task-list');
+  listNode.addEventListener('dragover', e => {
+    if (!dragId) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    const row = e.target.closest('.task-row');
+    if (!row || row.dataset.id === dragId) return;
+    const rect = row.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    clearDropMarks();
+    row.classList.add(after ? 'drop-after' : 'drop-before');
+    const rows = Array.from(listNode.children).filter(r => r.dataset.id !== dragId);
+    dropIndex = rows.indexOf(row) + (after ? 1 : 0);
+  });
+  listNode.addEventListener('dragleave', e => { if (!listNode.contains(e.relatedTarget)) clearDropMarks(); });
+  listNode.addEventListener('drop', e => {
+    e.preventDefault();
+    if (dragId && dropIndex !== null) void command('move', { id: dragId, index: dropIndex });
+    clearDropMarks();
+  });
   $('connection-form').onsubmit = async e => {
     e.preventDefault();
     const code = $('code').value; $('code').value = '';
@@ -183,20 +319,23 @@ if (isWidget) {
   };
   $('shortcut-form').onsubmit = async e => {
     e.preventDefault();
-    const shortcuts = Object.fromEntries(['switch','previous','pause'].map(k=>[k,$(`shortcut-${k}`).value.trim()]));
+    const shortcuts = Object.fromEntries(SHORTCUTS.map(k=>[k,$(`shortcut-${k}`).value.trim()]));
     const next = await run(() => api.settings({shortcuts}));
     if (next) { render(next); fillSettings(); }
   };
   $('minutes').onchange = () => run(() => api.settings({minutes:Number($('minutes').value)}));
   for (const key of ['sound','locked','topmost']) $(key).onchange = () => run(() => api.settings({[key]:$(key).checked}));
   $('data-folder').onclick = () => run(() => api.dataFolder());
+  $('open-dashboard').onclick = () => run(() => api.dashboard());
   document.addEventListener('keydown', e => {
     if (e.isComposing) return;
     if (e.key === 'Escape') { e.preventDefault(); void run(() => api.hide()); return; }
     if (view !== 'tasks' || (e.target instanceof HTMLInputElement && e.target !== $('search')) || e.target instanceof HTMLSelectElement) return;
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault(); highlight = Math.max(0,Math.min(filtered.length-1,highlight+(e.key === 'ArrowDown'?1:-1)));
-      renderTasks(); $('task-list').children[highlight]?.scrollIntoView({block:'nearest'});
+      renderTasks(); listNode.children[highlight]?.scrollIntoView({block:'nearest'});
+    } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && state?.selectedId) {
+      e.preventDefault(); void command('complete');
     } else if (e.key === 'Enter' && filtered[highlight] && (e.target === $('search') || e.target === document.body)) {
       e.preventDefault(); void choose(filtered[highlight].id);
     }
@@ -205,5 +344,3 @@ if (isWidget) {
 api.onState(render);
 api.onView(setView);
 run(async () => { render(await api.get()); if (!isWidget) setView('tasks'); });
-
-document.getElementById('open-dashboard').addEventListener('click', () => window.hustle.dashboard());

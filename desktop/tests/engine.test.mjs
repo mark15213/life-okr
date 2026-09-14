@@ -109,3 +109,50 @@ test('corrupted record is preserved, and valid state is atomically round-tripped
     assert.throws(()=>restoreState(raw),/校验/);
   } finally { fs.rmSync(dir,{recursive:true,force:true}); }
 });
+
+// addTask unshifts, so the queue order after setup is C, B, A.
+test('queue previews the tasks after the current one, wrapping, and next walks it', () => {
+  const {engine:e,tasks} = setup();
+  const [a,b,c] = tasks;
+  assert.deepEqual(e.queue().map(t=>t.id),[c.id,b.id,a.id]);
+  e.select(b.id);
+  assert.deepEqual(e.queue().map(t=>t.id),[a.id,c.id]);
+  e.next(); assert.equal(e.state.selectedId,a.id);
+  e.next(); assert.equal(e.state.selectedId,c.id);
+  e.next(); assert.equal(e.state.selectedId,b.id);
+});
+test('move reorders the queue and sync keeps the order the user chose', () => {
+  const {engine:e,tasks} = setup();
+  const [a,b,c] = tasks;
+  e.move(a.id,0);
+  assert.deepEqual(e.state.tasks.map(t=>t.id),[a.id,c.id,b.id]);
+  e.syncTasks([{id:'r1',title:'Remote 1',list:'work'},{id:'r2',title:'Remote 2',list:'life'}]);
+  e.move('ticktick:r2',1);
+  assert.deepEqual(e.state.tasks.map(t=>t.id),[a.id,'ticktick:r2',c.id,b.id,'ticktick:r1']);
+  e.syncTasks([{id:'r2',title:'Remote 2 renamed',list:'life'},{id:'r3',title:'Remote 3',list:'study'}]);
+  assert.deepEqual(e.state.tasks.map(t=>t.id),[a.id,'ticktick:r2',c.id,b.id,'ticktick:r3']);
+  assert.equal(e.task('ticktick:r2').title,'Remote 2 renamed');
+  assert.throws(()=>e.move('nope',0),/不可用/);
+});
+test('completing the current task hands a running round to the next queued task', () => {
+  const {engine:e,tasks,advance} = setup();
+  const [a,b,c] = tasks;
+  e.select(c.id); e.start(); advance(60000);
+  const done = e.complete();
+  assert.equal(done.id,c.id);
+  assert.equal(e.state.selectedId,b.id);
+  assert.equal(e.state.current.status,'running');
+  advance(60000); e.tick();
+  assert.deepEqual(totals(e.state.current).map(t=>[t.title,t.durationMs]),[['Project C',60000],['Project B',60000]]);
+  e.complete(a.id);
+  assert.equal(e.state.selectedId,b.id);
+  e.complete();
+  assert.equal(e.state.selectedId,null);
+  assert.equal(e.state.current.status,'paused');
+  assert.throws(()=>e.complete(),/先选择/);
+});
+test('addTask takes a category and rejects unknown ones', () => {
+  const {engine:e} = setup();
+  assert.equal(e.addTask('Read','study').list,'study');
+  assert.throws(()=>e.addTask('Read','nope'),/分类/);
+});

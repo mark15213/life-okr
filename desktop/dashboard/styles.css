@@ -14,13 +14,7 @@
 
 :root { --font-newspaper: 'Old Standard TT', Georgia, 'Times New Roman', serif; --font-inter: Inter, 'Segoe UI', sans-serif; --font-typewriter: 'Special Elite', 'Courier New', monospace; --font-gothic: 'UnifrakturMaguntia', serif; }
 body { background: #fafafa; color: #18181b; font-family: Inter, 'Segoe UI', 'Microsoft YaHei', sans-serif; }
-.desktop-bar { position: sticky; top: 0; z-index: 45; display: flex; align-items: center; gap: 18px; padding: 12px 24px; min-height: 58px; background: #ffffffed; border-bottom: 1px solid #e4e4e7; backdrop-filter: blur(12px); font-size: 12px; }
-.desktop-bar > a { color: #71717a; white-space: nowrap; }
-.desktop-bar > a[aria-current] { color: #18181b; font-weight: 700; }
-.desktop-bar > button { white-space: nowrap; cursor: pointer; }
-.desktop-bar > button kbd { margin-left: 8px; color: #a1a1aa; font-size: 10px; }
-.desktop-bar .desktop-origin { margin-left: auto; color: #a1a1aa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-.desktop-network { position: sticky; top: 58px; z-index: 44; display: flex; align-items: center; gap: 16px; background: #fffbeb; padding: 12px 24px; font-size: 12px; color: #92400e; }
-.desktop-network span { flex: 1; }
-.desktop-network button { cursor: pointer; }
-@media(max-width: 1000px) { .desktop-origin, .desktop-bar kbd { display: none; } .desktop-bar { gap: 14px; } }
+.desktop-network { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 44; display: flex; align-items: center; gap: 14px; background: #18181bf0; color: #fafafa; padding: 10px 16px; border-radius: 999px; font-size: 12px; box-shadow: 0 6px 25px #0002; max-width: calc(100vw - 48px); }
+.desktop-network span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desktop-network button { cursor: pointer; color: #a1a1aa; }
+.desktop-network button:hover { color: #fff; }

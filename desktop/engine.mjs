@@ -2,7 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 export const DEFAULT_SHORTCUTS = {
   switch: 'Control+Alt+K', previous: 'Control+Alt+J', pause: 'Control+Alt+P',
+  next: 'Control+Alt+N', complete: 'Control+Alt+D',
 };
+export const SHORTCUT_NAMES = Object.keys(DEFAULT_SHORTCUTS);
+export const TASK_LISTS = ['work', 'study', 'hustle', 'life'];
+export const QUEUE_PREVIEW = 3;
 
 export function emptyState() {
   return { version: 1, tasks: [], current: null, history: [], selectedId: null,
@@ -62,6 +66,42 @@ export class FocusEngine {
     const id = this.state.recent.find(id => id !== this.state.selectedId && this.task(id));
     if (id) this.select(id);
   }
+  // The task array is the queue: what comes after the current task, wrapping around, is "up next".
+  queue(limit = QUEUE_PREVIEW) {
+    const tasks = this.state.tasks;
+    const at = tasks.findIndex(t => t.id === this.state.selectedId);
+    const ordered = at < 0 ? tasks : [...tasks.slice(at + 1), ...tasks.slice(0, at)];
+    return ordered.slice(0, limit);
+  }
+  next() {
+    const [task] = this.queue(1);
+    if (task) this.select(task.id);
+  }
+  move(id, index) {
+    const tasks = this.state.tasks;
+    const from = tasks.findIndex(t => t.id === id);
+    if (from < 0) throw new Error('任务已不可用');
+    if (!Number.isInteger(index)) throw new Error('位置无效');
+    const [task] = tasks.splice(from, 1);
+    tasks.splice(Math.max(0, Math.min(index, tasks.length)), 0, task);
+  }
+  // Completing hands the round to the next queued task, so a running timer keeps running.
+  complete(id = this.state.selectedId) {
+    this.tick();
+    const task = this.task(id);
+    if (!task) throw new Error('先选择一个任务');
+    const wasCurrent = id === this.state.selectedId;
+    const [following] = wasCurrent ? this.queue(1) : [];
+    if (wasCurrent) this.closeSegment();
+    this.state.tasks = this.state.tasks.filter(t => t.id !== id);
+    this.state.recent = this.state.recent.filter(t => t !== id);
+    if (wasCurrent) {
+      this.state.selectedId = null;
+      if (following) this.select(following.id);
+      else if (this.state.current) this.state.current.status = 'paused';
+    }
+    return task;
+  }
   start(minutes = this.state.settings.minutes) {
     if (this.state.current) throw new Error('请先结束当前番茄');
     if (!this.task()) throw new Error('先选择一个任务');
@@ -96,10 +136,11 @@ export class FocusEngine {
     return round;
   }
   finish() { this.tick(); return this.end(); }
-  addTask(title) {
+  addTask(title, list = 'work') {
     title = typeof title === 'string' ? title.trim().slice(0, 200) : '';
     if (!title) throw new Error('请输入任务名称');
-    const task = { id: `local:${randomUUID()}`, title, list: 'work', source: 'local' };
+    if (!TASK_LISTS.includes(list)) throw new Error('请选择任务分类');
+    const task = { id: `local:${randomUUID()}`, title, list, source: 'local' };
     this.state.tasks.unshift(task);
     return task;
   }
@@ -113,7 +154,11 @@ export class FocusEngine {
       title: t.title.slice(0, 500), list: t.list ?? 'inbox', source: 'ticktick' }));
     const removed = this.state.selectedId?.startsWith('ticktick:') && !incoming.some(t => t.id === this.state.selectedId);
     if (removed) this.pause();
-    this.state.tasks = [...this.state.tasks.filter(t => t.source === 'local'), ...incoming];
+    // Queue order is the user's: known tasks keep their slot (with fresh title/list), new ones join at the back.
+    const fresh = new Map(incoming.map(t => [t.id, t]));
+    const kept = this.state.tasks.flatMap(t => t.source === 'local' ? [t] : fresh.has(t.id) ? [fresh.get(t.id)] : []);
+    const seen = new Set(kept.map(t => t.id));
+    this.state.tasks = [...kept, ...incoming.filter(t => !seen.has(t.id))];
     if (removed) this.state.selectedId = null;
     this.state.syncedAt = this.wall();
     return removed;

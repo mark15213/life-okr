@@ -34,7 +34,7 @@ async function waitState(page, predicate) {
   const { emptyState } = await import('../engine.mjs');
   const initial = emptyState();
   initial.settings.server = `http://127.0.0.1:${server.address().port}`;
-  initial.settings.shortcuts = { switch: 'Control+Alt+Shift+K', previous: 'Control+Alt+Shift+J', pause: 'Control+Alt+Shift+P' };
+  initial.settings.shortcuts = { switch: 'Control+Alt+Shift+K', previous: 'Control+Alt+Shift+J', pause: 'Control+Alt+Shift+P', next: 'Control+Alt+Shift+N', complete: 'Control+Alt+Shift+D' };
   fs.writeFileSync(path.join(profile, 'focus-state.json'), JSON.stringify(initial));
   const env = {...process.env,HUSTLE_TEST_PROFILE:profile};
   const launchOptions = process.env.HUSTLE_EXECUTABLE
@@ -55,7 +55,7 @@ async function waitState(page, predicate) {
     panel.on('pageerror',e=>errors.push(e.message));
     await panel.waitForSelector('#new-task');
     for (const title of ['Project A','Project B','Project C']) {
-      await panel.fill('#new-task',title); await panel.click('#add-form button');
+      await panel.fill('#new-task',title); await panel.click('#add-form button[type=submit]');
       await panel.waitForFunction(t=>Array.from(document.querySelectorAll('.task-title')).some(n=>n.textContent===t),title);
     }
     const tasks = await panel.evaluate(async()=> (await window.hustle.get()).tasks);

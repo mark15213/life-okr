@@ -9,13 +9,15 @@ import { usePasscode } from '@/lib/usePasscode';
 interface BackfillModalProps {
     onSuccess: () => void;
     isAuthed?: boolean;
+    /** Icon-only trigger for headers that should stay quiet. */
+    compact?: boolean;
 }
 
 // Mirrors CALORIES_PER_EXERCISE in app/api/records/backfill/route.ts — the server is what
 // actually writes the number; this is only here so the form can say what it will be.
 const CALORIES_PER_EXERCISE = 200;
 
-export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProps) {
+export default function BackfillModal({ onSuccess, isAuthed, compact }: BackfillModalProps) {
     const passcode = usePasscode();
     const canWrite = isAuthed ?? passcode.isAuthed;
     const [isOpen, setIsOpen] = useState(false);
@@ -103,15 +105,28 @@ export default function BackfillModal({ onSuccess, isAuthed }: BackfillModalProp
 
     return (
         <>
-            <button
-                onClick={() => canWrite && setIsOpen(true)}
-                disabled={!canWrite}
-                title={canWrite ? undefined : 'Unlock on the main dashboard first'}
-                className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-45"
-            >
-                {canWrite ? <Plus className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                {canWrite ? 'Log Past Data' : 'Locked'}
-            </button>
+            {compact ? (
+                <button
+                    onClick={() => canWrite && setIsOpen(true)}
+                    disabled={!canWrite}
+                    aria-label="Log Past Data"
+                    title={canWrite ? 'Log past data' : 'Unlock first'}
+                    className="flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors uppercase tracking-widest disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                    <Calendar className="w-4 h-4" />
+                    Log
+                </button>
+            ) : (
+                <button
+                    onClick={() => canWrite && setIsOpen(true)}
+                    disabled={!canWrite}
+                    title={canWrite ? undefined : 'Unlock on the main dashboard first'}
+                    className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white px-4 py-2 rounded-xl text-sm font-medium transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                    {canWrite ? <Plus className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                    {canWrite ? 'Log Past Data' : 'Locked'}
+                </button>
+            )}
 
             <AnimatePresence>
                 {isOpen && (
