@@ -81,7 +81,12 @@ async function boot() {
   const initial = stored && Number.isFinite(stored.x) && Number.isFinite(stored.y) ? stored : { x: area.x + area.width - WIDGET.width - 28, y: area.y + 32 };
   widget.setPosition(...Object.values(clampPosition(initial)));
   widget.setMovable(!engine.state.settings.locked);
-  if (process.platform === 'darwin') widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  if (process.platform === 'darwin') {
+    widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // The workspace transition can make the app a background UI element.
+    // Restore its Dock presence after configuring the floating window.
+    await app.dock.show();
+  }
   widget.on('moved', () => {
     clearTimeout(moveTimer);
     moveTimer = setTimeout(() => {

@@ -51,6 +51,10 @@ async function waitState(page, predicate) {
       await new Promise(resolve=>setTimeout(resolve,100));
     }
     assert.ok(panel && widget,'Both native windows created');
+    if (process.platform === 'darwin') {
+      assert.equal(await client.evaluate(({app}) => app.dock.isVisible()), true, 'Dock icon remains visible after workspace setup');
+      assert.equal(await client.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('view=widget')).isVisibleOnAllWorkspaces()), true, 'Floating window remains visible across workspaces');
+    }
     const errors=[];
     panel.on('pageerror',e=>errors.push(e.message));
     await panel.waitForSelector('#new-task');
@@ -113,6 +117,9 @@ async function waitState(page, predicate) {
     await reopened.waitForLoadState('load');
     await reopened.waitForFunction(()=>Boolean(window.hustle));
     const restored = await reopened.evaluate(()=>window.hustle.get());
+    if (process.platform === 'darwin') {
+      assert.equal(await client.evaluate(({app}) => app.dock.isVisible()), true, 'Dock icon remains visible after restart');
+    }
     assert.equal(restored.current.status,'paused');
     assert.equal(restored.history.length,1); assert.ok(restored.tasks.some(t=>t.title==='Synced task'));
     assert.deepEqual(errors,[]);
