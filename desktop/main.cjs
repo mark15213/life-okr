@@ -17,6 +17,8 @@ else boot().catch(error => { console.error(error); app.quit(); });
 async function boot() {
   const { FocusEngine, emptyState, restoreState, totals, statistics } = await import('./engine.mjs');
   await app.whenReady();
+  const appIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png'));
+  if (process.platform === 'darwin') app.dock.setIcon(appIcon);
   const file = path.join(app.getPath('userData'), 'focus-state.json');
   const loaded = storage.read(file, restoreState, emptyState);
   loaded.state.settings.server ||= DEFAULT_SERVER;
@@ -44,9 +46,9 @@ async function boot() {
     resizable: false, maximizable: false, fullscreenable: false, show: false, skipTaskbar: true,
     alwaysOnTop: engine.state.settings.topmost, hasShadow: false, webPreferences: safe });
   const panel = new BrowserWindow({ width: 490, height: 740, minWidth: 420, minHeight: 620,
-    title: 'Hustle · Focus', backgroundColor: '#ffffff', show: false, autoHideMenuBar: true,
+    title: 'Hustle · Focus', icon: appIcon, backgroundColor: '#ffffff', show: false, autoHideMenuBar: true,
     webPreferences: safe });
-  const dashboard = new BrowserWindow({ width: 1280, height: 900, minWidth: 800, minHeight: 600, title: 'Hustle', show: false, autoHideMenuBar: true, webPreferences: safe });
+  const dashboard = new BrowserWindow({ width: 1280, height: 900, minWidth: 800, minHeight: 600, title: 'Hustle', icon: appIcon, show: false, autoHideMenuBar: true, webPreferences: safe });
   panel.setMenuBarVisibility(false);
   for (const win of [widget, panel, dashboard]) {
     win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -158,18 +160,13 @@ async function boot() {
     }
   }
 
-  // Native image avoids external assets or network dependencies for the tray.
-  const pixels = Buffer.alloc(24 * 24 * 4);
-  for (let y = 0; y < 24; y++) for (let x = 0; x < 24; x++) {
-    const i = (y * 24 + x) * 4;
-    const ring = Math.abs(Math.hypot(x - 11.5, y - 11.5) - 8.5) < 1.5;
-    const hand = (x >= 11 && x <= 12 && y >= 5 && y <= 12) || (y >= 11 && y <= 12 && x >= 11 && x <= 17);
-    pixels[i] = pixels[i+1] = pixels[i+2] = 100;
-    pixels[i+3] = ring || hand ? 255 : 0;
-  }
-  const trayImage = nativeImage.createFromBitmap(pixels, { width: 24, height: 24 });
+  // macOS uses the alpha mask and selects the color for light/dark menu bars.
+  const trayImage = process.platform === 'darwin'
+    ? nativeImage.createFromPath(path.join(__dirname, 'assets', 'trayTemplate.png'))
+    : appIcon.resize({ width: 24, height: 24 });
   if (process.platform === 'darwin') trayImage.setTemplateImage(true);
   const tray = new Tray(trayImage);
+  tray.setToolTip('Hustle · 任务与番茄');
   function refreshMenu() {
     const settings = engine.state.settings;
     const menu = Menu.buildFromTemplate([
