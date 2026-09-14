@@ -20,6 +20,7 @@ async function waitState(page, predicate) {
   const profile = fs.mkdtempSync(path.join(output, 'profile-'));
   let client;
   const requests = [];
+  const remote = [];
   const server = http.createServer((req, res) => {
     requests.push(req.url);
     res.setHeader('Content-Type','application/json');
@@ -27,7 +28,16 @@ async function waitState(page, predicate) {
       res.setHeader('Set-Cookie','life-okr-session=test-session; HttpOnly; SameSite=Lax; Path=/');
       res.end(JSON.stringify({authenticated:true}));
     } else if (req.url === '/api/ticktick/tasks' && req.headers.cookie?.includes('life-okr-session=test-session')) {
-      res.end(JSON.stringify({tasks:[{id:'remote-a',title:'Synced task',list:'study'}]}));
+      if (req.method === 'POST') {
+        // Tasks the panel created offline are written to the dashboard once it connects.
+        let body=''; req.on('data',c=>body+=c); req.on('end',()=>{
+          const {title,list} = JSON.parse(body);
+          const task = {id:`remote-${remote.length+1}`,title,list};
+          remote.push(task); res.statusCode=201; res.end(JSON.stringify({task}));
+        });
+        return;
+      }
+      res.end(JSON.stringify({tasks:[{id:'remote-a',title:'Synced task',list:'study'},...remote]}));
     } else { res.statusCode=401; res.end('{}'); }
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -81,8 +91,10 @@ async function waitState(page, predicate) {
     assert.equal((await panel.evaluate(()=>window.hustle.get())).current.status,'paused');
     const registered = await client.evaluate(({globalShortcut})=>['Control+Alt+Shift+K','Control+Alt+Shift+J','Control+Alt+Shift+P'].map(k=>globalShortcut.isRegistered(k)));
     assert.deepEqual(registered,[true,true,true]);
-    await panel.fill('#search','Project B');
-    await panel.press('#search','Enter');
+    // Queue order is C, B, A; the arrow keys walk it and Enter switches to the highlighted row.
+    await panel.evaluate(() => document.activeElement?.blur());
+    await panel.press('body','ArrowDown');
+    await panel.press('body','Enter');
     assert.equal((await panel.evaluate(()=>window.hustle.get())).selectedId,b);
     await client.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.webContents.getURL().includes('/renderer/index.html')&&!w.webContents.getURL().includes('view=widget')).show());
     await panel.evaluate(()=>window.hustle.command('finish'));
@@ -90,6 +102,12 @@ async function waitState(page, predicate) {
     await panel.fill('#server',`http://127.0.0.1:${server.address().port}`);
     await panel.fill('#code','test-code'); await panel.click('#connect');
     await waitState(panel,s=>s.tasks.some(t=>t.title==='Synced task'));
+    // Connecting uploads the three offline tasks, which now carry dashboard identities.
+    await waitState(panel,s=>s.tasks.every(t=>t.source==='ticktick'));
+    assert.equal(remote.length,3);
+    const uploaded = await panel.evaluate(async()=> (await window.hustle.get()).tasks);
+    const a2 = uploaded.find(t=>t.title==='Project A').id;
+    assert.notEqual(a2,a);
     assert.equal(await panel.inputValue('#code'),'');
     assert.ok(requests.includes('/api/ticktick/tasks'));
     const unsafe = await panel.evaluate(async()=> {
@@ -99,8 +117,7 @@ async function waitState(page, predicate) {
     assert.notEqual(unsafe,'accepted');
     const round = (await panel.evaluate(()=>window.hustle.get())).history[0];
     assert.equal(round.status,'ended');
-    await panel.fill('#search','');
-    await panel.evaluate(id=>window.hustle.command('select',id),a);
+    await panel.evaluate(id=>window.hustle.command('select',id),a2);
     await panel.evaluate(()=>window.hustle.command('start'));
     // Exercise native power monitor events without locking the user's computer.
     await client.evaluate(({powerMonitor})=>powerMonitor.emit('lock-screen'));

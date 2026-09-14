@@ -41,7 +41,6 @@ function setView(next) {
   document.querySelectorAll('.view').forEach(node => { node.hidden = node.id !== `${view}-view`; });
   document.querySelectorAll('.header-tools [data-view]').forEach(node => node.classList.toggle('active', node.dataset.view === view));
   if (view === 'settings') fillSettings();
-  if (view === 'tasks') { $('search').focus(); $('search').select(); }
   if (state) render(state);
 }
 function fillSettings() {
@@ -177,8 +176,7 @@ function renderWidgetQueue() {
 /* Rows keep their identity across renders so a reorder can be animated with FLIP:
    measure where each row was, rebuild, measure again, and play the difference. */
 function renderTasks() {
-  const search = $('search').value.trim().toLocaleLowerCase();
-  filtered = state.tasks.filter(t => t.title.toLocaleLowerCase().includes(search));
+  filtered = state.tasks;
   highlight = Math.max(0, Math.min(highlight, filtered.length-1));
   const signature = JSON.stringify([filtered.map(t => [t.id,t.title,t.list]), state.selectedId]);
   const listNode = $('task-list');
@@ -193,14 +191,14 @@ function renderTasks() {
       row.setAttribute('role','option');
       row.setAttribute('aria-selected', String(task.id === state.selectedId));
       row.tabIndex = -1;
-      row.draggable = !search;
+      row.draggable = true;
       row.append(el('span','grip','⋮⋮'));
       row.append(el('i', `dot ${category(task.list)}`));
       const name = el('span','task-name');
       name.append(el('span','task-title',task.title),el('span','task-meta'));
       row.append(name,el('span','task-time'));
       if (task.id === state.selectedId) row.append(el('span','current-badge','当前'));
-      if (index > 0 || search) {
+      if (index > 0) {
         const top = el('button','row-top');
         top.innerHTML = topIcon; top.title = `「${task.title}」移到最前`; top.setAttribute('aria-label', `置顶 ${task.title}`);
         top.onclick = e => { e.stopPropagation(); void command('move', { id: task.id, index: 0 }); };
@@ -238,8 +236,6 @@ function renderTasks() {
     row.querySelector('.task-meta').textContent = `今日 ${clock(stats.today)} · 累计 ${clock(stats.total)}`;
   });
   $('empty').hidden = filtered.length > 0;
-  $('empty').querySelector('strong').textContent = state.tasks.length ? '没有匹配的任务' : '从一个任务开始。';
-  $('empty').querySelector('p').textContent = state.tasks.length ? '换个关键词，或添加一个本地任务。' : '创建本地任务，或在设置中连接看板，读取 TickTick 任务。';
 }
 function clearDropMarks() {
   dropIndex = null;
@@ -284,7 +280,31 @@ function renderHistory() {
 
 $(isWidget ? 'widget' : 'panel').hidden = false;
 if (isWidget) {
-  $('widget-clock').onclick = $('widget-task').onclick = () => run(() => api.open());
+  $('widget-task').onclick = () => run(() => api.open());
+  // The clock both opens the panel (a click) and drags the pill (press and move). A native
+  // drag region would eat the click, so the gesture is tracked here and the window follows.
+  let pressed = false, dragging = false, pressX = 0, pressY = 0, moveFrame = 0;
+  $('widget-clock').addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    pressed = true; dragging = false; pressX = e.screenX; pressY = e.screenY;
+  });
+  window.addEventListener('mousemove', e => {
+    if (!pressed) return;
+    if (!dragging) {
+      if (Math.hypot(e.screenX - pressX, e.screenY - pressY) < 4 || state?.settings.locked) return;
+      dragging = true; $('pill').classList.add('dragging'); void run(() => api.drag('start'));
+    }
+    if (moveFrame) return;
+    moveFrame = requestAnimationFrame(() => { moveFrame = 0; void run(() => api.drag('move')); });
+  });
+  const release = () => {
+    if (!pressed) return;
+    pressed = false;
+    if (dragging) { dragging = false; $('pill').classList.remove('dragging'); void run(() => api.drag('end')); }
+    else void run(() => api.open());
+  };
+  window.addEventListener('mouseup', release);
+  window.addEventListener('blur', release);
   $('widget-toggle').onclick = () => state.tasks.some(t=>t.id===state.selectedId) ? command('toggle') : run(() => api.open());
   $('widget-done').onclick = () => command('complete');
   $('widget-pin').onclick = async () => {
@@ -296,7 +316,6 @@ if (isWidget) {
   $('hide-panel').onclick = () => run(() => api.hide());
   $('dismiss-notice').onclick = () => command('dismiss');
   document.querySelectorAll('[data-view]').forEach(node => { node.onclick = () => setView(node.dataset.view === view ? 'tasks' : node.dataset.view); });
-  $('search').oninput = () => { highlight=0; renderTasks(); };
   $('toggle').onclick = () => command('toggle');
   $('finish').onclick = () => command('finish');
   $('complete').onclick = () => command('complete');
@@ -310,7 +329,7 @@ if (isWidget) {
   });
   $('add-form').onsubmit = async e => {
     e.preventDefault();
-    if (await command('add', { title: $('new-task').value, list: newList })) { $('new-task').value=''; $('search').value=''; renderTasks(); }
+    if (await command('add', { title: $('new-task').value, list: newList })) { $('new-task').value=''; renderTasks(); }
   };
   // Drag a row to change its place in the queue. The drop marker follows the pointer's half of the row.
   const listNode = $('task-list');
@@ -351,7 +370,7 @@ if (isWidget) {
   document.addEventListener('keydown', e => {
     if (e.isComposing) return;
     if (e.key === 'Escape') { e.preventDefault(); void run(() => api.hide()); return; }
-    if (view !== 'tasks' || (e.target instanceof HTMLInputElement && e.target !== $('search')) || e.target instanceof HTMLSelectElement) return;
+    if (view !== 'tasks' || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp' && filtered[highlight]) {
       e.preventDefault(); const id = filtered[highlight].id; highlight = 0; void command('move', { id, index: 0 });
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -359,7 +378,7 @@ if (isWidget) {
       renderTasks(); listNode.children[highlight]?.scrollIntoView({block:'nearest'});
     } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && state?.selectedId) {
       e.preventDefault(); void command('complete');
-    } else if (e.key === 'Enter' && filtered[highlight] && (e.target === $('search') || e.target === document.body)) {
+    } else if (e.key === 'Enter' && filtered[highlight] && e.target === document.body) {
       e.preventDefault(); void choose(filtered[highlight].id);
     }
   });

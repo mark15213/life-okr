@@ -115,6 +115,9 @@ button,input {
   flex-shrink:0}
 .trailing {
   width:4px}
+/* The clock is dragged by hand, so the pointer hints at it once the press turns into a move. */
+.pill.dragging { cursor:grabbing }
+.pill.dragging .clock { cursor:grabbing }
 .clock {
   font-size:20px;
   font-weight:600;
@@ -234,27 +237,6 @@ h3 {
   margin:0 0 18px}
 .section-heading h2 {
   font-size:16px}
-.search {
-  display:flex;
-  align-items:center;
-  background:#fafafa;
-  border:1px solid #e4e4e7;
-  border-radius:14px;
-  padding:0 12px}
-.search svg {
-  width:18px;
-  height:18px;
-  fill:none;
-  stroke:#a1a1aa;
-  stroke-width:1.5}
-.search input {
-  flex:1;
-  background:none;
-  border:0;
-  padding:13px 10px;
-  outline:none}
-.search:focus-within {
-  border-color:#a1a1aa}
 .summary {
   display:flex;
   justify-content:space-between;

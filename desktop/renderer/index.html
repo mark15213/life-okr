@@ -11,7 +11,7 @@
   <section id="widget" hidden aria-label="桌面番茄钟">
     <div id="pill" class="pill">
       <span class="drag-grip" title="拖动浮标"></span>
-      <button id="widget-clock" class="clock" title="查看本轮专注">30:00</button>
+      <button id="widget-clock" class="clock" title="查看本轮专注 · 按住拖动浮标">30:00</button>
       <span class="divider"></span>
       <button id="widget-task" class="widget-task" title="打开任务切换器"><i class="dot work"></i><span class="task-swap"><span>选择任务</span></span></button>
       <button id="widget-done" class="icon-button done" aria-label="完成当前任务" title="完成当前任务"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg></button>
@@ -31,17 +31,16 @@
     </header>
     <div id="notice" class="notice" hidden><span></span><button id="dismiss-notice" class="quiet" aria-label="关闭提示">×</button></div>
     <section id="tasks-view" class="view">
-      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"></circle><path d="m15 15 5 5"></path></svg><input id="search" placeholder="搜索或选择任务…" aria-label="搜索任务" autocomplete="off"></label>
       <div class="summary"><span id="round-summary">选择任务，开始一轮专注</span><span class="summary-hint">拖动排队 · ↑ 置顶 · ✓ 完成</span><button id="sync" class="quiet">刷新任务</button></div>
       <div id="task-list" role="listbox" aria-label="可切换的任务"></div>
-      <div id="empty" class="empty" hidden><strong>从一个任务开始。</strong><p>创建本地任务，或在设置中连接看板，读取 TickTick 任务。</p></div>
+      <div id="empty" class="empty" hidden><strong>从一个任务开始。</strong><p>在下方添加任务，已连接看板时会直接写入 TickTick。</p></div>
       <form id="add-form" class="add-form"><input id="new-task" aria-label="新任务名称" placeholder="添加任务…" maxlength="200" required><div class="list-picker" role="radiogroup" aria-label="任务分类"><button type="button" class="list-chip work is-on" data-list="work" aria-pressed="true" title="Work"><i class="dot work"></i><span class="label">Work</span></button><button type="button" class="list-chip study" data-list="study" aria-pressed="false" title="Study"><i class="dot study"></i><span class="label">Study</span></button><button type="button" class="list-chip hustle" data-list="hustle" aria-pressed="false" title="Hustle"><i class="dot hustle"></i><span class="label">Hustle</span></button><button type="button" class="list-chip life" data-list="life" aria-pressed="false" title="Life"><i class="dot life"></i><span class="label">Life</span></button></div><button type="submit" class="quiet" aria-label="添加任务">＋</button></form>
       <div id="round-controls" class="round-controls"><div><strong id="panel-clock">30:00</strong><span id="current-label">尚未开始</span></div><button id="finish" class="secondary" hidden>结束本轮</button><button id="complete" class="secondary done-button" title="完成当前任务，切到下一个"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>完成</button><button id="toggle" class="primary">开始专注</button></div>
     </section>
     <section id="history-view" class="view" hidden><div class="section-heading"><button data-view="tasks" class="quiet back">← 返回</button><h2>专注历史</h2></div><div id="history-list"></div></section>
     <section id="settings-view" class="view" hidden>
       <div class="section-heading"><button data-view="tasks" class="quiet back">← 返回</button><h2>设置</h2></div>
-      <form id="connection-form" class="settings-group"><h3>连接 Hustle</h3><p class="footnote">共用看板登录与数据。远端任务专注结束后自动同步，本地任务仅保存在本机。</p><label>看板地址<input id="server" type="url" placeholder="https://your-dashboard.vercel.app" required></label><label>看板解锁码<input id="code" type="password" autocomplete="off" required></label><button id="connect" class="primary">连接并同步</button><span id="sync-status" class="footnote"></span></form>
+      <form id="connection-form" class="settings-group"><h3>连接 Hustle</h3><p class="footnote">共用看板登录与数据。连接后新增的任务直接写入 TickTick，专注结束后自动同步；未连接时新增的任务仅保存在本机。</p><label>看板地址<input id="server" type="url" placeholder="https://your-dashboard.vercel.app" required></label><label>看板解锁码<input id="code" type="password" autocomplete="off" required></label><button id="connect" class="primary">连接并同步</button><span id="sync-status" class="footnote"></span></form>
       <div class="settings-group"><h3>番茄与浮标</h3><label class="setting-row">新一轮时长<select id="minutes"><option value="15">15 分钟</option><option value="25">25 分钟</option><option value="30">30 分钟</option><option value="45">45 分钟</option><option value="60">60 分钟</option></select></label><label class="setting-row">浮标始终置顶<input id="topmost" type="checkbox"></label><label class="setting-row">锁定浮标位置<input id="locked" type="checkbox"></label><label class="setting-row">到时提示音<input id="sound" type="checkbox"></label><p id="notification-status" class="footnote">系统通知和提示音受系统勿扰及通知权限控制。</p></div>
       <form id="shortcut-form" class="settings-group"><h3>全局快捷键</h3><p id="shortcut-help" class="footnote"></p><label>打开任务切换器<input id="shortcut-switch" required></label><label>切回上一任务<input id="shortcut-previous" required></label><label>暂停 / 继续<input id="shortcut-pause" required></label><label>切到队列下一个<input id="shortcut-next" required></label><label>完成当前任务<input id="shortcut-complete" required></label><button class="secondary">保存快捷键</button><p id="shortcut-errors" class="error" role="status"></p></form>
       <div class="settings-group"><h3>本地数据</h3><p class="footnote">关闭主窗口会继续计时。锁屏、休眠或从托盘退出会暂停。重启后主动继续；两台设备独立记录。</p><div class="button-row"><button id="open-dashboard" class="secondary">打开完整看板</button><button id="data-folder" class="secondary">打开数据目录</button></div></div>

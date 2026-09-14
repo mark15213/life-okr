@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('hustle', {
   sync: () => invoke('focus:sync'),
   open: () => invoke('focus:open'),
   hide: () => invoke('focus:hide'),
+  drag: phase => invoke('focus:drag', phase),
   dataFolder: () => invoke('focus:data-folder'),
   onState: callback => {
     const listener = (_event, state) => callback(state);

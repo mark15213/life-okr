@@ -15,7 +15,7 @@ if (!gotLock) app.quit();
 else boot().catch(error => { console.error(error); app.quit(); });
 
 async function boot() {
-  const { FocusEngine, emptyState, restoreState, totals, statistics, SHORTCUT_NAMES } = await import('./engine.mjs');
+  const { FocusEngine, emptyState, restoreState, totals, statistics, SHORTCUT_NAMES, TASK_LISTS } = await import('./engine.mjs');
   const WIDGET = { width: 300, height: 98 };
   await app.whenReady();
   const appIcon = nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png'));
@@ -87,19 +87,35 @@ async function boot() {
     await app.dock.show();
     app.dock.setIcon(appIcon);
   }
-  widget.on('moved', () => {
-    clearTimeout(moveTimer);
-    moveTimer = setTimeout(() => {
-      if (widget.isDestroyed()) return;
+  // After any move the pill snaps to a nearby screen edge and its place is remembered.
+  function settle() {
+    if (widget.isDestroyed()) return;
+    const [x, y] = widget.getPosition();
+    const next = clampPosition({ x, y });
+    const area = screen.getDisplayNearestPoint(next).workArea;
+    if (Math.abs(next.x - area.x) < 20) next.x = area.x;
+    if (Math.abs(next.x + WIDGET.width - area.x - area.width) < 20) next.x = area.x + area.width - WIDGET.width;
+    if (x !== next.x || y !== next.y) widget.setPosition(next.x, next.y);
+    engine.state.settings.position = next; persist();
+  }
+  widget.on('moved', () => { clearTimeout(moveTimer); moveTimer = setTimeout(settle, 250); });
+  // The clock is dragged by hand (a native drag region would swallow its click), so the
+  // renderer reports the gesture and the main process moves the window with the cursor.
+  let dragOrigin = null;
+  function dragWidget(phase) {
+    if (engine.state.settings.locked) { dragOrigin = null; return; }
+    const cursor = screen.getCursorScreenPoint();
+    if (phase === 'start') {
       const [x, y] = widget.getPosition();
-      const next = clampPosition({ x, y });
-      const area = screen.getDisplayNearestPoint(next).workArea;
-      if (Math.abs(next.x - area.x) < 20) next.x = area.x;
-      if (Math.abs(next.x + WIDGET.width - area.x - area.width) < 20) next.x = area.x + area.width - WIDGET.width;
-      if (x !== next.x || y !== next.y) widget.setPosition(next.x, next.y);
-      engine.state.settings.position = next; persist();
-    }, 250);
-  });
+      dragOrigin = { cursor, window: { x, y } };
+      clearTimeout(moveTimer);
+    } else if (phase === 'move' && dragOrigin) {
+      const p = clampPosition({ x: dragOrigin.window.x + cursor.x - dragOrigin.cursor.x, y: dragOrigin.window.y + cursor.y - dragOrigin.cursor.y });
+      widget.setPosition(p.x, p.y);
+    } else if (phase === 'end') {
+      dragOrigin = null; clearTimeout(moveTimer); settle();
+    }
+  }
   function relocate() {
     const [x, y] = widget.getPosition();
     const p = clampPosition({ x, y }); widget.setPosition(p.x, p.y);
@@ -231,6 +247,7 @@ async function boot() {
     update(); return snapshot();
   });
   handle('focus:hide', () => panel.hide());
+  handle('focus:drag', phase => { if (['start', 'move', 'end'].includes(phase)) dragWidget(phase); });
   // A TickTick task is closed on the server first; only then does it leave the local queue,
   // so a failed request never makes a task vanish here while it stays open in the cloud.
   async function completeTask(id = engine.state.selectedId) {
@@ -247,6 +264,27 @@ async function boot() {
     if (task.source === 'ticktick') dashboard.webContents.send('dashboard:refresh');
     return snapshot();
   }
+  // A new task goes into the connected dashboard (TickTick) so it lands in the database like
+  // everything else; only without a connection does it stay a local, this-machine-only task.
+  async function addTask(title, list = 'work') {
+    title = typeof title === 'string' ? title.trim().slice(0, 200) : '';
+    if (!title) throw new Error('请输入任务名称');
+    if (!TASK_LISTS.includes(list)) throw new Error('请选择任务分类');
+    // The default server address is filled in before any login, so a past sync is the real sign of a connection.
+    if (!engine.state.settings.server || !engine.state.syncedAt) { engine.addTask(title, list); return; }
+    if (syncing) throw new Error('正在同步，请稍候');
+    const server = serverURL(engine.state.settings.server);
+    syncing = true; broadcast();
+    try {
+      const created = await request(server, '/api/ticktick/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, list }) });
+      try { await sync(server); } catch { /* the task was created; a failed re-fetch only delays the list */ }
+      const id = `ticktick:${encodeURIComponent(server)}:${created.task.id}`;
+      // A freshly added task is what you meant to do next, so it goes to the front of the queue.
+      if (engine.state.tasks.some(t => t.id === id)) engine.move(id, 0);
+      else engine.state.tasks.unshift({ id, externalId: created.task.id, title: created.task.title.slice(0, 500), list: created.task.list ?? list, source: 'ticktick' });
+      dashboard.webContents.send('dashboard:refresh');
+    } finally { syncing = false; }
+  }
   handle('focus:command', async ({ type, value } = {}) => {
     pulse();
     switch (type) {
@@ -257,7 +295,7 @@ async function boot() {
       case 'previous': engine.previous(); break;
       case 'next': engine.next(); break;
       case 'move': engine.move(value?.id, value?.index); break;
-      case 'add': typeof value === 'string' ? engine.addTask(value) : engine.addTask(value?.title, value?.list); break;
+      case 'add': await addTask(typeof value === 'string' ? value : value?.title, typeof value === 'string' ? undefined : value?.list); break;
       case 'complete': return completeTask(typeof value === 'string' ? value : undefined);
       case 'dismiss': notice = ''; break;
       default: throw new Error('未知操作');
@@ -312,6 +350,8 @@ async function boot() {
       persist();
       dashboard.webContents.send('dashboard:refresh');
       await sync(server);
+      const moved = await migrateLocalTasks(server);
+      if (moved) notice = `已把 ${moved} 个本机任务写入看板。`;
       update(); return snapshot();
     } finally { syncing = false; broadcast(); }
   });
@@ -341,10 +381,38 @@ async function boot() {
       notice = '专注已保存在本机，云端同步未完成；连接恢复后会自动重试。'; broadcast();
     } finally { uploadingFocus = false; }
   }
+  // Tasks created before the panel wrote to the dashboard exist only in this machine's file.
+  // Once connected, each one is created in TickTick and swapped for its cloud twin in place:
+  // same queue slot, same selection, and its focus time stays attached under the new id.
+  async function migrateLocalTasks(server) {
+    const locals = engine.state.tasks.filter(t => t.source === 'local');
+    if (!locals.length) return 0;
+    let moved = 0;
+    for (const task of locals) {
+      const list = TASK_LISTS.includes(task.list) ? task.list : 'work';
+      const created = await request(server, '/api/ticktick/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: task.title, list }) });
+      const id = `ticktick:${encodeURIComponent(server)}:${created.task.id}`;
+      const twin = { id, externalId: created.task.id, title: created.task.title.slice(0, 500), list: created.task.list ?? list, source: 'ticktick' };
+      engine.state.tasks = engine.state.tasks.filter(t => t.id !== id).map(t => t.id === task.id ? twin : t);
+      if (engine.state.selectedId === task.id) engine.state.selectedId = id;
+      engine.state.recent = engine.state.recent.map(t => t === task.id ? id : t);
+      for (const round of [...engine.state.history, ...(engine.state.current ? [engine.state.current] : [])]) {
+        for (const segment of round.segments) if (segment.taskId === task.id) segment.taskId = id;
+      }
+      moved += 1; persist();
+    }
+    return moved;
+  }
   async function refresh() {
     if (syncing || !engine.state.settings.server) return;
     syncing = true; broadcast();
-    try { await sync(serverURL(engine.state.settings.server)); update(); }
+    try {
+      const server = serverURL(engine.state.settings.server);
+      await sync(server);
+      const moved = await migrateLocalTasks(server);
+      if (moved) { notice = `已把 ${moved} 个本机任务写入看板。`; dashboard.webContents.send('dashboard:refresh'); }
+      update();
+    }
     catch (error) { notice = error.message; }
     finally { syncing = false; broadcast(); }
   }
@@ -357,6 +425,8 @@ async function boot() {
   openDashboard();
   if (loaded.error || shortcutErrors.length) openPanel('settings');
   refreshMenu(); broadcast();
+  // A dashboard that has synced before is refreshed right away, which also uploads any tasks still local.
+  if (engine.state.syncedAt) void refresh();
   timer = setInterval(() => { pulse(); broadcast(); }, 250);
   checkpoint = setInterval(() => { if (engine.state.current?.status === 'running') { pulse(); persist(); } }, 2000);
   syncTimer = setInterval(() => { void refresh(); void uploadFocus(); }, 5 * 60000);
