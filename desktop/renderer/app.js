@@ -5,6 +5,7 @@ const isWidget = new URLSearchParams(location.search).get('view') === 'widget';
 const pauseIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
 const playIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7Z"/></svg>';
 const doneIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>';
+const topIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 12l6-6 6 6"/></svg>';
 const SHORTCUTS = ['switch', 'previous', 'pause', 'next', 'complete'];
 const LISTS = ['work', 'study', 'hustle', 'life'];
 let state, view = 'tasks', highlight = 0, filtered = [], taskSignature = '', historySignature = '';
@@ -115,6 +116,10 @@ function render(next) {
     $('pill').classList.toggle('paused', Boolean(round && !running));
     $('pill').classList.toggle('complete', completed);
     $('pill').classList.toggle('locked', state.settings.locked);
+    const pinned = state.settings.topmost && state.settings.locked;
+    $('widget-pin').setAttribute('aria-pressed', String(pinned));
+    $('widget-pin').classList.toggle('is-on', pinned);
+    $('widget-pin').title = pinned ? '已钉在桌面上：点击取消置顶与锁定' : '钉在桌面上：始终置顶并锁定位置';
     renderWidgetQueue();
     requestAnimationFrame(() => {
       marquee($('widget-task').querySelector('.task-swap>span:not(.leaving):not(.entering)'));
@@ -195,6 +200,12 @@ function renderTasks() {
       name.append(el('span','task-title',task.title),el('span','task-meta'));
       row.append(name,el('span','task-time'));
       if (task.id === state.selectedId) row.append(el('span','current-badge','当前'));
+      if (index > 0 || search) {
+        const top = el('button','row-top');
+        top.innerHTML = topIcon; top.title = `「${task.title}」移到最前`; top.setAttribute('aria-label', `置顶 ${task.title}`);
+        top.onclick = e => { e.stopPropagation(); void command('move', { id: task.id, index: 0 }); };
+        row.append(top);
+      }
       const done = el('button','row-done');
       done.innerHTML = doneIcon; done.title = `完成「${task.title}」`; done.setAttribute('aria-label', `完成 ${task.title}`);
       done.onclick = e => { e.stopPropagation(); void completeRow(row, task.id); };
@@ -276,6 +287,11 @@ if (isWidget) {
   $('widget-clock').onclick = $('widget-task').onclick = () => run(() => api.open());
   $('widget-toggle').onclick = () => state.tasks.some(t=>t.id===state.selectedId) ? command('toggle') : run(() => api.open());
   $('widget-done').onclick = () => command('complete');
+  $('widget-pin').onclick = async () => {
+    const on = !(state.settings.topmost && state.settings.locked);
+    const next = await run(() => api.settings({ topmost: on, locked: on }));
+    if (next) render(next);
+  };
 } else {
   $('hide-panel').onclick = () => run(() => api.hide());
   $('dismiss-notice').onclick = () => command('dismiss');
@@ -336,7 +352,9 @@ if (isWidget) {
     if (e.isComposing) return;
     if (e.key === 'Escape') { e.preventDefault(); void run(() => api.hide()); return; }
     if (view !== 'tasks' || (e.target instanceof HTMLInputElement && e.target !== $('search')) || e.target instanceof HTMLSelectElement) return;
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'ArrowUp' && filtered[highlight]) {
+      e.preventDefault(); const id = filtered[highlight].id; highlight = 0; void command('move', { id, index: 0 });
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault(); highlight = Math.max(0,Math.min(filtered.length-1,highlight+(e.key === 'ArrowDown'?1:-1)));
       renderTasks(); listNode.children[highlight]?.scrollIntoView({block:'nearest'});
     } else if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && state?.selectedId) {

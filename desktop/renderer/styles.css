@@ -527,6 +527,31 @@ h1 {
   top:-2px}
 .task-row.drop-after::after {
   bottom:-2px}
+.row-top {
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  display:grid;
+  place-items:center;
+  color:#a1a1aa;
+  flex-shrink:0;
+  opacity:0;
+  transform:scale(.8);
+  transition:opacity .15s,transform .15s,background .15s,color .15s}
+.task-row:hover .row-top,.task-row.highlighted .row-top,.row-top:focus-visible {
+  opacity:1;
+  transform:scale(1)}
+.row-top:hover {
+  background:#f0f0f2;
+  color:#18181b}
+.row-top svg {
+  width:13px;
+  height:13px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.2;
+  stroke-linecap:round;
+  stroke-linejoin:round}
 .row-done {
   width:28px;
   height:28px;
@@ -664,8 +689,40 @@ h1 {
   color:#a1a1aa}
 .icon-button.done:hover:not(:disabled) {
   color:#4ade80}
-.widget-queue {
+.widget-strip {
   margin:5px 10px 0;
+  display:flex;
+  align-items:center;
+  gap:4px}
+.widget-pin {
+  width:26px;
+  height:26px;
+  flex-shrink:0;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  background:#18181be6;
+  border:1px solid #27272a;
+  color:#71717a;
+  box-shadow:0 2px 6px #0002;
+  transition:color .15s,background .15s}
+.widget-pin svg {
+  width:13px;
+  height:13px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.8;
+  stroke-linecap:round;
+  stroke-linejoin:round}
+.widget-pin:hover {
+  color:#e4e4e7}
+.widget-pin.is-on {
+  color:#18181b;
+  background:#fafafa;
+  border-color:#fafafa}
+.widget-queue {
+  flex:1;
+  min-width:0;
   height:26px;
   display:flex;
   align-items:center;

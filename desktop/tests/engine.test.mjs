@@ -111,15 +111,17 @@ test('corrupted record is preserved, and valid state is atomically round-tripped
 });
 
 // addTask unshifts, so the queue order after setup is C, B, A.
-test('queue previews the tasks after the current one, wrapping, and next walks it', () => {
+test('queue is always the top of the priority order minus the current task', () => {
   const {engine:e,tasks} = setup();
   const [a,b,c] = tasks;
   assert.deepEqual(e.queue().map(t=>t.id),[c.id,b.id,a.id]);
   e.select(b.id);
-  assert.deepEqual(e.queue().map(t=>t.id),[a.id,c.id]);
-  e.next(); assert.equal(e.state.selectedId,a.id);
+  assert.deepEqual(e.queue().map(t=>t.id),[c.id,a.id]);
   e.next(); assert.equal(e.state.selectedId,c.id);
-  e.next(); assert.equal(e.state.selectedId,b.id);
+  assert.deepEqual(e.queue().map(t=>t.id),[b.id,a.id]);
+  e.move(a.id,0);
+  assert.deepEqual(e.queue().map(t=>t.id),[a.id,b.id]);
+  e.next(); assert.equal(e.state.selectedId,a.id);
 });
 test('move reorders the queue and sync keeps the order the user chose', () => {
   const {engine:e,tasks} = setup();

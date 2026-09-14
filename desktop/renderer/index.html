@@ -18,7 +18,7 @@
       <button id="widget-toggle" class="icon-button" aria-label="开始番茄"></button>
       <span class="drag-grip trailing"></span>
     </div>
-    <div id="widget-queue" class="widget-queue" role="listbox" aria-label="接下来的任务"></div>
+    <div class="widget-strip"><div id="widget-queue" class="widget-queue" role="listbox" aria-label="接下来的任务"></div><button id="widget-pin" class="widget-pin" aria-pressed="false" aria-label="钉在桌面上" title="钉在桌面上：始终置顶并锁定位置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/><path d="M12 14v7"/></svg></button></div>
   </section>
   <main id="panel" hidden>
     <header>
@@ -32,7 +32,7 @@
     <div id="notice" class="notice" hidden><span></span><button id="dismiss-notice" class="quiet" aria-label="关闭提示">×</button></div>
     <section id="tasks-view" class="view">
       <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"></circle><path d="m15 15 5 5"></path></svg><input id="search" placeholder="搜索或选择任务…" aria-label="搜索任务" autocomplete="off"></label>
-      <div class="summary"><span id="round-summary">选择任务，开始一轮专注</span><span class="summary-hint">拖动排队 · 悬停 ✓ 完成</span><button id="sync" class="quiet">刷新任务</button></div>
+      <div class="summary"><span id="round-summary">选择任务，开始一轮专注</span><span class="summary-hint">拖动排队 · ↑ 置顶 · ✓ 完成</span><button id="sync" class="quiet">刷新任务</button></div>
       <div id="task-list" role="listbox" aria-label="可切换的任务"></div>
       <div id="empty" class="empty" hidden><strong>从一个任务开始。</strong><p>创建本地任务，或在设置中连接看板，读取 TickTick 任务。</p></div>
       <form id="add-form" class="add-form"><input id="new-task" aria-label="新任务名称" placeholder="添加任务…" maxlength="200" required><div class="list-picker" role="radiogroup" aria-label="任务分类"><button type="button" class="list-chip work is-on" data-list="work" aria-pressed="true" title="Work"><i class="dot work"></i><span class="label">Work</span></button><button type="button" class="list-chip study" data-list="study" aria-pressed="false" title="Study"><i class="dot study"></i><span class="label">Study</span></button><button type="button" class="list-chip hustle" data-list="hustle" aria-pressed="false" title="Hustle"><i class="dot hustle"></i><span class="label">Hustle</span></button><button type="button" class="list-chip life" data-list="life" aria-pressed="false" title="Life"><i class="dot life"></i><span class="label">Life</span></button></div><button type="submit" class="quiet" aria-label="添加任务">＋</button></form>

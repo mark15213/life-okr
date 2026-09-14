@@ -66,12 +66,9 @@ export class FocusEngine {
     const id = this.state.recent.find(id => id !== this.state.selectedId && this.task(id));
     if (id) this.select(id);
   }
-  // The task array is the queue: what comes after the current task, wrapping around, is "up next".
+  // The task array is a priority queue: "up next" is always its top, minus whatever is running.
   queue(limit = QUEUE_PREVIEW) {
-    const tasks = this.state.tasks;
-    const at = tasks.findIndex(t => t.id === this.state.selectedId);
-    const ordered = at < 0 ? tasks : [...tasks.slice(at + 1), ...tasks.slice(0, at)];
-    return ordered.slice(0, limit);
+    return this.state.tasks.filter(t => t.id !== this.state.selectedId).slice(0, limit);
   }
   next() {
     const [task] = this.queue(1);
