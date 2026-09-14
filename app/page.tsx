@@ -161,7 +161,7 @@ export default function Home() {
         <header className="mb-14 flex flex-col gap-6 border-b border-zinc-200/80 pb-7 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-5xl md:text-6xl tracking-tighter text-zinc-900 drop-shadow-sm font-bold" style={{ fontFamily: 'var(--font-newspaper)', letterSpacing: '-0.02em' }}>
-              Hustle.
+              Hustle
             </h1>
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">

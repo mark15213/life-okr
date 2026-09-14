@@ -46,7 +46,7 @@ async function boot() {
     resizable: false, maximizable: false, fullscreenable: false, show: false, skipTaskbar: true,
     alwaysOnTop: engine.state.settings.topmost, hasShadow: false, webPreferences: safe });
   const panel = new BrowserWindow({ width: 440, height: 620, minWidth: 400, minHeight: 540,
-    title: 'Hustle · Focus', icon: appIcon, backgroundColor: '#ffffff', show: false, autoHideMenuBar: true,
+    title: 'Hustle', icon: appIcon, backgroundColor: '#ffffff', show: false, autoHideMenuBar: true,
     webPreferences: safe });
   const dashboard = new BrowserWindow({ width: 1280, height: 900, minWidth: 800, minHeight: 600, title: 'Hustle', icon: appIcon, show: false, autoHideMenuBar: true, webPreferences: safe });
   panel.setMenuBarVisibility(false);
