@@ -115,10 +115,10 @@ function render(next) {
     $('pill').classList.toggle('paused', Boolean(round && !running));
     $('pill').classList.toggle('complete', completed);
     $('pill').classList.toggle('locked', state.settings.locked);
-    const pinned = state.settings.topmost && state.settings.locked;
+    const pinned = state.settings.topmost;
     $('widget-pin').setAttribute('aria-pressed', String(pinned));
     $('widget-pin').classList.toggle('is-on', pinned);
-    $('widget-pin').title = pinned ? '已钉在桌面上：点击取消置顶与锁定' : '钉在桌面上：始终置顶并锁定位置';
+    $('widget-pin').title = pinned ? '已始终置顶（包括全屏应用）：点击取消' : '始终置顶：在全屏应用上方显示，仍可拖动';
     renderWidgetQueue();
     requestAnimationFrame(() => {
       marquee($('widget-task').querySelector('.task-swap>span:not(.leaving):not(.entering)'));
@@ -308,8 +308,8 @@ if (isWidget) {
   $('widget-toggle').onclick = () => state.tasks.some(t=>t.id===state.selectedId) ? command('toggle') : run(() => api.open());
   $('widget-done').onclick = () => command('complete');
   $('widget-pin').onclick = async () => {
-    const on = !(state.settings.topmost && state.settings.locked);
-    const next = await run(() => api.settings({ topmost: on, locked: on }));
+    const on = !(state.settings.topmost);
+    const next = await run(() => api.settings({ topmost: on, locked: false }));
     if (next) render(next);
   };
 } else {

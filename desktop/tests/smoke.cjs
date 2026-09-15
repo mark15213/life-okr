@@ -65,6 +65,18 @@ async function waitState(page, predicate) {
       assert.equal(await client.evaluate(({app}) => app.dock.isVisible()), true, 'Dock icon remains visible after workspace setup');
       assert.equal(await client.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('view=widget')).isVisibleOnAllWorkspaces()), true, 'Floating window remains visible across workspaces');
     }
+    // Pin must remain draggable, including when clearing the old pin's position lock.
+    await widget.evaluate(() => window.hustle.settings({ topmost: false, locked: true }));
+    await widget.waitForFunction(() => document.querySelector('#widget-pin').getAttribute('aria-pressed') === 'false');
+    await widget.locator('#widget-pin').evaluate(button => button.click());
+    await waitState(widget, s => s.settings.topmost && !s.settings.locked);
+    assert.deepEqual(await client.evaluate(({BrowserWindow}) => {
+      const w = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('view=widget'));
+      return [w.isAlwaysOnTop(), w.isMovable()];
+    }), [true, true], 'Pinned widget stays on top and remains draggable');
+    await widget.locator('#widget-pin').evaluate(button => button.click());
+    await waitState(widget, s => !s.settings.topmost && !s.settings.locked);
+    assert.equal(await client.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('view=widget')).isAlwaysOnTop()), false);
     const errors=[];
     panel.on('pageerror',e=>errors.push(e.message));
     await panel.waitForSelector('#new-task');

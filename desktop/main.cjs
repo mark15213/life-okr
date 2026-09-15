@@ -44,6 +44,9 @@ async function boot() {
     nodeIntegration: false, sandbox: true, backgroundThrottling: false, spellcheck: false };
   const widget = new BrowserWindow({ width: WIDGET.width, height: WIDGET.height, frame: false, transparent: true,
     resizable: false, maximizable: false, fullscreenable: false, show: false, skipTaskbar: true,
+    // A non-activating macOS panel can join another app's native fullscreen Space.
+    // A normal window cannot do that while Hustle remains a foreground Dock app.
+    ...(process.platform === 'darwin' ? { type: 'panel' } : {}),
     alwaysOnTop: engine.state.settings.topmost, hasShadow: false, webPreferences: safe });
   const panel = new BrowserWindow({ width: 440, height: 620, minWidth: 400, minHeight: 540,
     title: 'Hustle', icon: appIcon, backgroundColor: '#ffffff', show: false, autoHideMenuBar: true,
@@ -79,13 +82,18 @@ async function boot() {
   const stored = engine.state.settings.position;
   const initial = stored && Number.isFinite(stored.x) && Number.isFinite(stored.y) ? stored : { x: area.x + area.width - WIDGET.width - 28, y: area.y + 32 };
   widget.setPosition(...Object.values(clampPosition(initial)));
-  widget.setMovable(!engine.state.settings.locked);
+  applyWidgetSettings();
   if (process.platform === 'darwin') {
     widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     // The workspace transition can make the app a background UI element.
     // Restore its Dock presence after configuring the floating window.
     await app.dock.show();
     app.dock.setIcon(appIcon);
+  }
+  function applyWidgetSettings() {
+    // macOS fullscreen apps live in separate Spaces; use a level above their windows.
+    widget.setAlwaysOnTop(engine.state.settings.topmost, process.platform === 'darwin' ? 'screen-saver' : 'floating');
+    widget.setMovable(!engine.state.settings.locked);
   }
   // After any move the pill snaps to a nearby screen edge and its place is remembered.
   function settle() {
@@ -199,7 +207,7 @@ async function boot() {
       { label: engine.state.current?.status === 'running' ? '暂停番茄' : '开始 / 继续', click: () => action(() => engine.toggle()) },
       { label: '下一个任务', click: () => action(() => engine.next()) },
       { label: '完成当前任务', click: () => void completeTask().catch(error => { notice = error.message; broadcast(); }) },
-      { label: '始终置顶', type: 'checkbox', checked: settings.topmost, click: item => action(() => { settings.topmost = item.checked; widget.setAlwaysOnTop(item.checked); }) },
+      { label: '始终置顶', type: 'checkbox', checked: settings.topmost, click: item => action(() => { settings.topmost = item.checked; applyWidgetSettings(); }) },
       { label: '锁定位置', type: 'checkbox', checked: settings.locked, click: item => action(() => { settings.locked = item.checked; widget.setMovable(!item.checked); }) },
       { label: '历史记录', click: () => openPanel('history') },
       { label: '设置', click: () => openPanel('settings') },
@@ -320,7 +328,7 @@ async function boot() {
       if (new Set(Object.values(next)).size !== SHORTCUT_NAMES.length) throw new Error('快捷键不能重复');
       s.shortcuts = next; registerShortcuts();
     }
-    widget.setAlwaysOnTop(s.topmost); widget.setMovable(!s.locked); update(); return snapshot();
+    applyWidgetSettings(); update(); return snapshot();
   });
 
   async function request(server, route, options = {}) {
