@@ -22,6 +22,10 @@ export const VAULT_EPOCH = '2026-08-19';
 export const LEGACY_EARNED = 5100;
 
 export const REWARD = 100;
+// App calendar date (Asia/Shanghai). Completed earlier milestones keep their rate;
+// unfinished progress carries forward and pays the rate when the milestone is reached.
+export const PRODUCTIVITY_RATE_EPOCH = '2026-09-16';
+export const PRODUCTIVITY_REWARD = 200;
 export const TASKS_PER_REWARD = 5;
 export const FOCUS_MINUTES_PER_REWARD = 180;
 export const EXERCISES_PER_REWARD = 2;
@@ -64,6 +68,8 @@ export function computeVaultEarnings(
     let qualifyingExercises = 0;
     let totalTasks = 0;
     let totalFocusMinutes = 0;
+    let taskReward = 0;
+    let focusReward = 0;
 
     for (const r of era) {
         balance += r.pushup_balance;
@@ -71,13 +77,16 @@ export function computeVaultEarnings(
         // than by one global flag: sliding back into debt stops new rewards instead of
         // erasing the ones already banked.
         if (balance <= 0 && r.cigarettes === 0) qualifyingExercises += r.exercises;
+        const rate = r.date >= PRODUCTIVITY_RATE_EPOCH ? PRODUCTIVITY_REWARD : REWARD;
+        taskReward += (Math.floor((totalTasks + r.tasks_completed) / TASKS_PER_REWARD)
+            - Math.floor(totalTasks / TASKS_PER_REWARD)) * rate;
+        focusReward += (Math.floor((totalFocusMinutes + r.focus_minutes) / FOCUS_MINUTES_PER_REWARD)
+            - Math.floor(totalFocusMinutes / FOCUS_MINUTES_PER_REWARD)) * rate;
         totalTasks += r.tasks_completed;
         totalFocusMinutes += r.focus_minutes;
     }
 
     const exerciseReward = Math.floor(qualifyingExercises / EXERCISES_PER_REWARD) * REWARD;
-    const taskReward = Math.floor(totalTasks / TASKS_PER_REWARD) * REWARD;
-    const focusReward = Math.floor(totalFocusMinutes / FOCUS_MINUTES_PER_REWARD) * REWARD;
 
     return {
         totalEarned: LEGACY_EARNED + exerciseReward + taskReward + focusReward,

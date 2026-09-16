@@ -126,3 +126,39 @@ test('nextMilestone reports the count that completes the next reward', () => {
     assert.equal(nextMilestone(5, 5), 10);
     assert.equal(nextMilestone(181, 180), 360);
 });
+
+test('September rate change preserves banked rewards and carries unfinished progress', () => {
+    const history = day('2026-09-15', { tasks_completed: 9, focus_minutes: 359 });
+    const before = computeVaultEarnings([history], 0);
+    assert.equal(before.taskReward, 100);
+    assert.equal(before.focusReward, 100);
+    const after = computeVaultEarnings([
+        day('2026-09-16', { tasks_completed: 1, focus_minutes: 1 }), history,
+    ], 0);
+    assert.equal(after.taskReward, 300);
+    assert.equal(after.focusReward, 300);
+    assert.equal(after.totalEarned - before.totalEarned, 400);
+});
+
+test('new productivity rate applies on and after September 16, exercises stay at 100', () => {
+    const earnings = computeVaultEarnings([
+        day('2026-09-16', { tasks_completed: 5, focus_minutes: 180, exercises: 2 }),
+        day('2026-09-17', { tasks_completed: 10, focus_minutes: 360, exercises: 2 }),
+    ], 0);
+    assert.equal(earnings.taskReward, 600);
+    assert.equal(earnings.focusReward, 600);
+    assert.equal(earnings.exerciseReward, 200);
+});
+
+test('current historical totals are not doubled, and optimistic cutover records are deduplicated', () => {
+    const history = day('2026-09-15', { tasks_completed: 51, focus_minutes: 1980 });
+    const before = computeVaultEarnings([history], 0);
+    assert.equal(before.totalEarned, LEGACY_EARNED + 1000 + 1100);
+    const after = computeVaultEarnings([
+        history,
+        day('2026-09-16', { tasks_completed: 1 }),
+        day('2026-09-16', { tasks_completed: 4, focus_minutes: 180 }),
+    ], 0);
+    assert.equal(after.totalEarned, before.totalEarned + 400);
+    assert.equal(after.totalTasks, 55);
+});

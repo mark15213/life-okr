@@ -12,6 +12,8 @@ import {
     EXERCISES_PER_REWARD,
     TASKS_PER_REWARD,
     FOCUS_MINUTES_PER_REWARD,
+    PRODUCTIVITY_RATE_EPOCH,
+    PRODUCTIVITY_REWARD,
 } from '@/lib/vault';
 
 interface Purchase {
@@ -178,6 +180,9 @@ export default function FloatingVault({ records, todayRecord, cumulativeBalance,
                                     <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Next Milestones</h3>
                                     <span className="text-[10px] text-zinc-300">since {VAULT_EPOCH}</span>
                                 </div>
+                                <p className="text-xs text-zinc-500 mb-3">
+                                    From {PRODUCTIVITY_RATE_EPOCH}: ¥{PRODUCTIVITY_REWARD} per {TASKS_PER_REWARD} tasks or {FOCUS_MINUTES_PER_REWARD / 60} focus hours. Earlier rewards stay unchanged; unfinished progress carries over.
+                                </p>
                                 <div className="grid grid-cols-1 gap-2 mb-8">
                                     <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 border border-zinc-100">
                                         <div className="flex items-center gap-2 text-sm text-zinc-600">
