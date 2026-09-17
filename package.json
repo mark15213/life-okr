@@ -14,6 +14,7 @@
     "test": "tsx --test scripts/lib/*.test.ts lib/*.test.ts lib/ticktick/*.test.ts",
     "setup-db": "tsx scripts/setup-db.ts",
     "migrate-category-stats": "tsx scripts/migrate-add-category-stats.ts",
+    "migrate-app-state": "tsx scripts/migrate-add-app-state.ts",
     "report-tokens": "tsx scripts/report-tokens.ts",
     "sync-ticktick": "tsx scripts/sync-ticktick.ts"
   },

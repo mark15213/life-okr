@@ -59,6 +59,17 @@ async function setupDatabase() {
       )
     `;
 
+    console.log('Creating app_state table...');
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS app_state (
+        key        TEXT PRIMARY KEY,
+        value      JSONB NOT NULL,
+        version    BIGINT NOT NULL DEFAULT 1,
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `;
+
     console.log('✅ Database setup complete!');
   } catch (error) {
     console.error('❌ Error setting up database:', error);
