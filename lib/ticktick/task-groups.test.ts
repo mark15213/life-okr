@@ -9,9 +9,9 @@ test('applyQueueOrder sorts by the shared order', () => {
   assert.deepEqual(sorted.map((t) => t.id), ['c', 'a', 'b']);
 });
 
-test('applyQueueOrder leaves unknown ids at the back in their incoming order', () => {
+test('applyQueueOrder puts unknown ids at the front in their incoming order', () => {
   const sorted = applyQueueOrder([task('new1'), task('b'), task('new2'), task('a')], ['a', 'b']);
-  assert.deepEqual(sorted.map((t) => t.id), ['a', 'b', 'new1', 'new2']);
+  assert.deepEqual(sorted.map((t) => t.id), ['new1', 'new2', 'a', 'b']);
 });
 
 test('applyQueueOrder ignores ids the order still lists but the panel no longer has', () => {

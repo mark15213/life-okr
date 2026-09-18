@@ -177,7 +177,7 @@ struct FocusEngine {
     // MARK: Sync
 
     /// Merge a fresh TickTick list: known tasks keep their slot (with fresh title/list), new
-    /// ones join at the back, vanished ones drop out. Returns true if the selected task vanished.
+    /// ones join at the front, vanished ones drop out. Returns true if the selected task vanished.
     @discardableResult
     mutating func syncTasks(_ incoming: [PanelTask], now: Double) -> Bool {
         tick(now: now)
@@ -185,26 +185,31 @@ struct FocusEngine {
                                uniquingKeysWith: { a, _ in a })
         let removed = selectedId.map { fresh[$0] == nil } ?? false
         if removed { pause(now: now) }
-        var kept: [QueuedTask] = []
+        var known: [QueuedTask] = []
         var seen = Set<String>()
         for t in tasks {
-            if let f = fresh[t.id] { kept.append(f); seen.insert(t.id) }
+            if let f = fresh[t.id] { known.append(f); seen.insert(t.id) }
         }
+        // A task is captured because it is the next thing to do, so anything the queue has not
+        // seen before heads it rather than sinking to the bottom of a long list.
+        var added: [QueuedTask] = []
         for t in incoming where !seen.contains(t.id) {
-            kept.append(fresh[t.id]!)
+            added.append(fresh[t.id]!)
             seen.insert(t.id)
         }
-        tasks = kept
+        tasks = added + known
         if removed { selectedId = nil }
         return removed
     }
 
-    /// Apply the server-side priority order. Ids not in the list keep relative order at the back.
+    /// Apply the server-side priority order. Ids the order has never seen keep their relative
+    /// order but sort ahead of everything it knows — same rule as `applyQueueOrder` on the web.
     mutating func applyOrder(_ order: [String]) {
         let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        let count = tasks.count
         tasks = tasks.enumerated().sorted { a, b in
-            let ra = rank[a.element.id] ?? (order.count + a.offset)
-            let rb = rank[b.element.id] ?? (order.count + b.offset)
+            let ra = rank[a.element.id] ?? (a.offset - count)
+            let rb = rank[b.element.id] ?? (b.offset - count)
             return ra < rb
         }.map(\.element)
     }

@@ -359,6 +359,19 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
         else writeStored(POMODORO_DURATION_KEY, minutes);
     };
 
+    /**
+     * All is the shared priority queue — one flat list in the order the iPhone's Focus screen
+     * works down, dragged here and read there. Grouping it by date would fight that: a task
+     * can only sit in one place, and "third thing I will do" and "due Thursday" disagree.
+     *
+     * The per-list tabs keep the date grouping. Filtered to one list the question is when a
+     * thing is due rather than what is next, and a partial order dragged inside a filter would
+     * have to be guessed back onto the full queue.
+     */
+    const { order, saving: savingOrder, error: orderError, save: saveOrder } = useQueueOrder(
+        isAuthed && isOpen
+    );
+
     /* ----------------------------------------------------------------- task writes */
 
     const capture = async (thenFocus: boolean) => {
@@ -385,6 +398,9 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
             // immediately instead of waiting on another whole-account sync.
             const created: PanelTask = body.task;
             mutate((prev) => ({ tasks: [created, ...(prev?.tasks ?? [])] }), { revalidate: false });
+            // Write it into the shared order too, so the phone and a reload see it at the top
+            // as well rather than only this screen until the next drag.
+            if (order) saveOrder([created.id, ...order.filter((id) => id !== created.id)]);
             if (thenFocus) await begin(created);
         } catch {
             setNotice({ tone: 'error', message: 'Could not reach the server to add that task.' });
@@ -449,19 +465,6 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
         }
         return counts;
     }, [tasks]);
-
-    /**
-     * All is the shared priority queue — one flat list in the order the iPhone's Focus screen
-     * works down, dragged here and read there. Grouping it by date would fight that: a task
-     * can only sit in one place, and "third thing I will do" and "due Thursday" disagree.
-     *
-     * The per-list tabs keep the date grouping. Filtered to one list the question is when a
-     * thing is due rather than what is next, and a partial order dragged inside a filter would
-     * have to be guessed back onto the full queue.
-     */
-    const { order, saving: savingOrder, error: orderError, save: saveOrder } = useQueueOrder(
-        isAuthed && isOpen
-    );
 
     const orderedTasks = useMemo(() => applyQueueOrder(tasks, order), [tasks, order]);
 

@@ -168,7 +168,8 @@ final class FocusStore: ObservableObject {
     func addTask(title: String, list: String) async {
         do {
             let task = try await api.createTask(title: title, list: list)
-            engine.tasks.append(QueuedTask(id: task.id, title: task.title, list: task.list, dueLabel: task.dueLabel, group: task.group))
+            // Front of the queue: a task is captured because it is the next thing to do.
+            engine.tasks.insert(QueuedTask(id: task.id, title: task.title, list: task.list, dueLabel: task.dueLabel, group: task.group), at: 0)
             if engine.selectedId == nil { engine.selectedId = task.id }
             saveSnapshot()
             scheduleSaveOrder()
