@@ -86,11 +86,12 @@ test('removing active remote task pauses round and keeps historical name and dur
   assert.equal(totals(e.state.current)[0].title,'Remote A');
   assert.equal(totals(e.state.current)[0].durationMs,20000);
 });
-test('previous shortcut alternates MRU tasks without resetting the round', () => {
+test('previous walks backward and wraps without resetting the round', () => {
   const {engine:e,tasks,advance} = setup();
   e.select(tasks[0].id); e.start(); advance(20000); e.select(tasks[1].id);
+  e.previous(); assert.equal(e.state.selectedId,tasks[2].id);
   e.previous(); assert.equal(e.state.selectedId,tasks[0].id);
-  e.previous(); assert.equal(e.state.selectedId,tasks[1].id);
+  e.next(); assert.equal(e.state.selectedId,tasks[2].id);
   assert.equal(e.state.current.elapsedMs,20000);
 });
 test('corrupted record is preserved, and valid state is atomically round-tripped', () => {
@@ -111,16 +112,20 @@ test('corrupted record is preserved, and valid state is atomically round-tripped
 });
 
 // addTask unshifts, so the queue order after setup is C, B, A.
-test('queue is always the top of the priority order minus the current task', () => {
+test('next traverses the whole queue and wraps, including after reordering', () => {
   const {engine:e,tasks} = setup();
   const [a,b,c] = tasks;
   assert.deepEqual(e.queue().map(t=>t.id),[c.id,b.id,a.id]);
   e.select(b.id);
-  assert.deepEqual(e.queue().map(t=>t.id),[c.id,a.id]);
+  assert.deepEqual(e.queue().map(t=>t.id),[a.id,c.id]);
+  e.next(); assert.equal(e.state.selectedId,a.id);
   e.next(); assert.equal(e.state.selectedId,c.id);
+  e.next(); assert.equal(e.state.selectedId,b.id);
+  e.select(c.id);
   assert.deepEqual(e.queue().map(t=>t.id),[b.id,a.id]);
   e.move(a.id,0);
-  assert.deepEqual(e.queue().map(t=>t.id),[a.id,b.id]);
+  assert.deepEqual(e.queue().map(t=>t.id),[b.id,a.id]);
+  e.next(); assert.equal(e.state.selectedId,b.id);
   e.next(); assert.equal(e.state.selectedId,a.id);
 });
 test('move reorders the queue and sync keeps the order the user chose', () => {

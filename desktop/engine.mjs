@@ -63,12 +63,23 @@ export class FocusEngine {
     this.state.recent = [id, ...this.state.recent.filter(t => t !== id)].slice(0, 100);
   }
   previous() {
+    const tasks = this.state.tasks;
+    const idx = tasks.findIndex(t => t.id === this.state.selectedId);
+    // Wrap from the front back to the end, so previous() is the exact inverse of next().
+    if (tasks.length > 1 && idx >= 0) return this.select(tasks[(idx - 1 + tasks.length) % tasks.length].id);
     const id = this.state.recent.find(id => id !== this.state.selectedId && this.task(id));
     if (id) this.select(id);
   }
-  // The task array is a priority queue: "up next" is always its top, minus whatever is running.
+  // The task array is a priority queue: "up next" is it rotated to start just after whatever is
+  // running, wrapping past the end. Rotating rather than filtering is what lets repeated next()
+  // calls walk the whole queue — taking the top minus the selection ping-pongs between the first
+  // two tasks and never reaches the third.
   queue(limit = QUEUE_PREVIEW) {
-    return this.state.tasks.filter(t => t.id !== this.state.selectedId).slice(0, limit);
+    const tasks = this.state.tasks;
+    if (tasks.length <= 1) return this.state.selectedId == null ? tasks.slice(0, limit) : [];
+    const idx = tasks.findIndex(t => t.id === this.state.selectedId);
+    if (idx < 0) return tasks.slice(0, limit);
+    return [...tasks.slice(idx + 1), ...tasks.slice(0, idx)].slice(0, limit);
   }
   next() {
     const [task] = this.queue(1);

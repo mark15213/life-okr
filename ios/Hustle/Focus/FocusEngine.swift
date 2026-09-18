@@ -51,15 +51,24 @@ struct FocusEngine {
 
     var selected: QueuedTask? { tasks.first { $0.id == selectedId } }
 
-    /// "Up next": the queue minus whatever is selected.
+    /// "Up next": the queue rotated to start just after the selected task, wrapping past the
+    /// end back to the front. Rotating rather than filtering is what lets repeated swipes walk
+    /// the whole queue — taking the top row minus the selection would bounce between the first
+    /// two tasks forever and never reach the third.
     func queue(limit: Int = 3) -> [QueuedTask] {
-        Array(tasks.filter { $0.id != selectedId }.prefix(limit))
+        guard tasks.count > 1 else { return selectedId == nil ? Array(tasks.prefix(limit)) : [] }
+        guard let idx = tasks.firstIndex(where: { $0.id == selectedId }) else {
+            return Array(tasks.prefix(limit))
+        }
+        let rotated = Array(tasks[(idx + 1)...]) + Array(tasks[..<idx])
+        return Array(rotated.prefix(limit))
     }
 
-    /// The task before the selected one in queue order (for swipe-down).
+    /// The task before the selected one in queue order (for swipe-down), wrapping from the
+    /// front back to the end so swipe-down is the exact inverse of swipe-up.
     var previousInQueue: QueuedTask? {
-        guard let idx = tasks.firstIndex(where: { $0.id == selectedId }), idx > 0 else { return nil }
-        return tasks[idx - 1]
+        guard tasks.count > 1, let idx = tasks.firstIndex(where: { $0.id == selectedId }) else { return nil }
+        return tasks[(idx - 1 + tasks.count) % tasks.count]
     }
 
     // MARK: Time
