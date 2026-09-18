@@ -149,9 +149,12 @@ export interface StoredState<T> {
   updatedAt: number;
 }
 
-function toStored<T>(row: Record<string, unknown>): StoredState<T> {
+export function toStored<T>(row: Record<string, unknown>): StoredState<T> {
+  // Older writes passed JSON.stringify(value) to a JSONB parameter, which postgres.js
+  // serialized again. Read those rows as objects too, without discarding saved order.
+  const value = typeof row.value === 'string' ? JSON.parse(row.value) : row.value;
   return {
-    value: row.value as T,
+    value: value as T,
     version: Number(row.version),
     updatedAt: new Date(row.updated_at as string | Date).getTime(),
   };
@@ -173,7 +176,7 @@ export async function writeAppState<T>(
   value: T,
   ifVersion?: number
 ): Promise<StoredState<T> | null> {
-  const json = JSON.stringify(value);
+  const json = sql.json(value as Parameters<typeof sql.json>[0]);
   const rows = ifVersion === undefined
     ? await sql`
         INSERT INTO app_state (key, value, version, updated_at) VALUES (${key}, ${json}::jsonb, 1, NOW())

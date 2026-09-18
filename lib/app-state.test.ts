@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isAppStateKey, parseFocusSession, parseQueueOrder } from './app-state';
+import { isAppStateKey, parseFocusSession, parseQueueOrder, toStored } from './app-state';
+
+test('stored state decodes legacy JSON strings without losing queue order or version', () => {
+  const value = { order: ['c', 'a', 'b'] };
+  const row = { value, version: '7', updated_at: '2026-09-18T00:00:00Z' };
+  const expected = { value, version: 7, updatedAt: Date.parse(row.updated_at) };
+  assert.deepEqual(toStored(row), expected);
+  assert.deepEqual(toStored({ ...row, value: JSON.stringify(value) }), expected);
+});
+
+test('stored state preserves cleared sessions, including legacy encoded null', () => {
+  for (const value of [null, 'null']) {
+    assert.equal(toStored({ value, version: 2, updated_at: new Date() }).value, null);
+  }
+});
 
 test('only the two known keys are accepted', () => {
   assert.equal(isAppStateKey('queue-order'), true);
