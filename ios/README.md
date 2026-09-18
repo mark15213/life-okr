@@ -78,4 +78,4 @@ system from `endsAt`, so it stays live without the app running.
 - Daily Word is stored on the phone only (`@AppStorage`) — the web version has no API for it yet.
 - Focus-session takeover from another device is polled on foreground; there is no push.
 - No settings screen (server URL, pomodoro length). Length is fixed at 30 minutes on purpose.
-- App icon asset set is empty; drop a 1024×1024 PNG into `Hustle/Resources/Assets.xcassets/AppIcon.appiconset`.
+- App icon uses the Hustle Pop Art glove. Regenerate it with `npm --prefix desktop run build:icons` from the repository root.

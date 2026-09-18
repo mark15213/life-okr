@@ -1,13 +1,16 @@
-# Hustle temporary identity
+# Hustle Pop Art identity
 
-Created with the built-in imagegen tool on 2026-09-14. The white H suggests forward motion; the amber clock connects it to focus time. The menu bar uses a transparent monochrome variant with native macOS template rendering.
+The red boxing glove represents daily rounds of focused work, completed tasks, and exercise. Thick black contours, primary colors, cream highlights, and halftone patches share a visual language with Gulp.
 
-`logo-source.png` and `tray-source.png` are the original generated artwork. `icon.png`, `icon.icns`, and `trayTemplate*.png` are production assets. Run `npm --prefix desktop run build:icons` on macOS to regenerate sizes and ICNS with the workspace Sharp dependency and Apple iconutil. Resizing preserves transparency.
+Generated with the built-in imagegen tool. The approved artwork and full prompt are in `../../design/brand/hustle-pop-art-glove-v1.png` and `../../design/brand/hustle-pop-art-glove-v1.prompt.md`.
 
-## App icon prompt
+`logo-source.png` is the full-color source. `tray-source.png` is a simplified black-on-transparent glove for native macOS template rendering. Its generation prompt is in `../../design/brand/hustle-tray.prompt.md`.
 
-Use case: logo-brand. Create one finished macOS application icon for Hustle, a personal productivity and focus timer app. A bold custom white H monogram whose crossbar subtly rises forward, with a small clean clock-like notch or negative-space time cue integrated into the H. Very minimal, memorable, strong readable silhouette at 16px. Centered on a charcoal-black rounded-square macOS icon tile with generous internal padding, tiny warm amber accent only if it improves the time cue. Flat precise vector-like geometry, beautifully balanced optical proportions. Square 1024x1024 asset. Actual transparent background outside the rounded tile; tile fills approximately 88% of canvas. No wordmark, no extra text, no mockup, no presentation sheet, no surrounding objects, no gradients or 3D. Return the actual single production icon.
+Run `npm --prefix desktop run build:icons` from the repository root using the workspace Sharp dependency. It produces:
 
-## Menu bar edit prompt
+- Desktop `icon.png` and, on macOS with Apple iconutil, `icon.icns`.
+- Menu bar `trayTemplate.png`, `trayTemplate@2x.png`, and `trayTemplate@3x.png`.
+- Next.js `app/icon.png`, multi-resolution `app/favicon.ico`, and `app/apple-icon.png`.
+- The opaque 1024×1024 iOS `AppIcon.png` registered in the asset catalog.
 
-Create a macOS menu bar template icon variant of this exact H logo. Remove the entire dark rounded square background. Render ONLY the H silhouette and the small clock hands in solid black ink with actual fully transparent background everywhere else, including the clock cutout. Preserve rising crossbar and the clock cutout on upper right. No white ink, no gray background, no tile, no shadows, no gradients. H should fill 80 percent of square canvas, centered, small padding, crisp bold geometry legible at 18x18 pixels. Output a single transparent PNG mask.
+Desktop and web PNG/ICO assets preserve transparency. Apple touch and iOS icons use a cream background; the OS applies its own rounded mask. Rebuild the app to include updated assets in distribution packages.
