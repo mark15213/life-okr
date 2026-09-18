@@ -26,7 +26,12 @@ struct HustleApp: App {
                     guard phase == .active else { return }
                     Task {
                         await dashboard.refresh()
-                        if session.isAuthed { await focus.pullSession(); await focus.flushUploads() }
+                        guard session.isAuthed else { return }
+                        // pullOrder first: a reorder made on the dashboard while the phone was
+                        // in a pocket should be the queue you come back to.
+                        await focus.pullOrder()
+                        await focus.pullSession()
+                        await focus.flushUploads()
                     }
                 }
                 .onChange(of: session.isAuthed) { _, authed in

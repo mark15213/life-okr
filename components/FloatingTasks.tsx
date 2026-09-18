@@ -1,13 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import useSWR, { mutate as globalMutate } from 'swr';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder, useDragControls } from 'framer-motion';
 import {
     AlertTriangle,
     Ban,
     Check,
     ChevronDown,
+    GripVertical,
     ListChecks,
     Lock,
     Pause,
@@ -18,9 +19,11 @@ import {
     X,
 } from 'lucide-react';
 import { useDesktopFocus } from '@/lib/useDesktopFocus';
+import { useQueueOrder } from '@/lib/useQueueOrder';
 import { cn } from '@/lib/utils';
 import { CAPTURE_LIST_KEYS, TASK_LISTS, type TaskListKey } from '@/lib/ticktick/lists';
 import {
+    applyQueueOrder,
     TASK_GROUPS,
     TASK_GROUP_LABELS,
     type PanelTask,
@@ -447,8 +450,40 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
         return counts;
     }, [tasks]);
 
+    /**
+     * All is the shared priority queue — one flat list in the order the iPhone's Focus screen
+     * works down, dragged here and read there. Grouping it by date would fight that: a task
+     * can only sit in one place, and "third thing I will do" and "due Thursday" disagree.
+     *
+     * The per-list tabs keep the date grouping. Filtered to one list the question is when a
+     * thing is due rather than what is next, and a partial order dragged inside a filter would
+     * have to be guessed back onto the full queue.
+     */
+    const { order, saving: savingOrder, error: orderError, save: saveOrder } = useQueueOrder(
+        isAuthed && isOpen
+    );
+
+    const orderedTasks = useMemo(() => applyQueueOrder(tasks, order), [tasks, order]);
+
+    const reorder = useCallback((next: PanelTask[]) => saveOrder(next.map((t) => t.id)), [saveOrder]);
+
+    /** Keyboard equivalent of the grip: the drag is pointer-only otherwise. */
+    const nudge = useCallback(
+        (id: string, delta: number) => {
+            const from = orderedTasks.findIndex((t) => t.id === id);
+            const to = from + delta;
+            if (from < 0 || to < 0 || to >= orderedTasks.length) return;
+            const next = [...orderedTasks];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            reorder(next);
+        },
+        [orderedTasks, reorder]
+    );
+
     const groups = useMemo(() => {
-        const visible = filter === 'all' ? tasks : tasks.filter((t) => t.list === filter);
+        if (filter === 'all') return [];
+        const visible = tasks.filter((t) => t.list === filter);
         return TASK_GROUPS.map((group) => ({
             group,
             items: visible.filter((t) => t.group === group),
@@ -872,11 +907,45 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                     <div className="px-6 py-10 text-center text-sm text-zinc-400">
                                         Loading your tasks…
                                     </div>
+                                ) : tasks.length === 0 ? (
+                                    <div className="px-6 py-10 text-center text-sm text-zinc-400">
+                                        Nothing open. Add the first thing above.
+                                    </div>
+                                ) : filter === 'all' ? (
+                                    <>
+                                        <div className="px-6 pt-3.5 pb-1.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-400">
+                                            Priority · drag to reorder
+                                            <span className="flex-1 h-px bg-zinc-100" />
+                                            {/* The order is the only thing on this screen another
+                                                device acts on, so the row says where it stands. */}
+                                            <span className="normal-case tracking-normal font-semibold text-zinc-300">
+                                                {savingOrder ? 'Saving…' : 'Synced to Focus'}
+                                            </span>
+                                        </div>
+
+                                        {orderError && (
+                                            <div className="px-6 pb-1.5 text-[11px] text-rose-600">{orderError}</div>
+                                        )}
+
+                                        <Reorder.Group as="div" axis="y" values={orderedTasks} onReorder={reorder}>
+                                            {orderedTasks.map((task, index) => (
+                                                <DraggableTaskRow
+                                                    key={task.id}
+                                                    task={task}
+                                                    position={index + 1}
+                                                    outcome={closing.get(task.id)}
+                                                    isFocused={session?.taskId === task.id}
+                                                    onComplete={() => void close(task, 'complete')}
+                                                    onWontDo={() => void close(task, 'wont-do')}
+                                                    onBegin={() => void begin(task)}
+                                                    onNudge={(delta) => nudge(task.id, delta)}
+                                                />
+                                            ))}
+                                        </Reorder.Group>
+                                    </>
                                 ) : groups.length === 0 ? (
                                     <div className="px-6 py-10 text-center text-sm text-zinc-400">
-                                        {tasks.length === 0
-                                            ? 'Nothing open. Add the first thing above.'
-                                            : 'Nothing in this list.'}
+                                        Nothing in this list.
                                     </div>
                                 ) : (
                                     groups.map(({ group, items }) => (
@@ -891,104 +960,17 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                                                 <span className="flex-1 h-px bg-zinc-100" />
                                             </div>
 
-                                            {items.map((task) => {
-                                                const outcome = closing.get(task.id);
-                                                const isClosing = outcome !== undefined;
-                                                const isFocused = session?.taskId === task.id;
-                                                return (
-                                                    <div
-                                                        key={task.id}
-                                                        className={cn(
-                                                            'group/row flex items-center gap-3 px-6 py-2.5 border-t border-zinc-50 transition-colors',
-                                                            isFocused ? 'bg-zinc-50' : 'hover:bg-zinc-50/60'
-                                                        )}
-                                                    >
-                                                        {/* The ring doubles as the in-flight indicator, and which glyph
-                                                            lands in it is the only thing distinguishing the two ways a
-                                                            row can be leaving: filled dark with a tick for done, muted
-                                                            with a cross for written off. */}
-                                                        <button
-                                                            onClick={() => void close(task, 'complete')}
-                                                            disabled={isClosing}
-                                                            aria-label={`Complete ${task.title}`}
-                                                            className={cn(
-                                                                'w-[19px] h-[19px] shrink-0 rounded-full border-2 flex items-center justify-center transition-colors',
-                                                                outcome === 'complete'
-                                                                    ? 'bg-zinc-900 border-zinc-900 text-white'
-                                                                    : outcome === 'wont-do'
-                                                                      ? 'bg-zinc-300 border-zinc-300 text-white'
-                                                                      : 'hover:bg-zinc-100'
-                                                            )}
-                                                            style={
-                                                                isClosing
-                                                                    ? undefined
-                                                                    : { borderColor: PRIORITY_RINGS[task.priority] ?? PRIORITY_RINGS[0] }
-                                                            }
-                                                        >
-                                                            {outcome === 'complete' && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
-                                                            {outcome === 'wont-do' && <X className="w-2.5 h-2.5" strokeWidth={4} />}
-                                                        </button>
-
-                                                        <span
-                                                            className={cn(
-                                                                'flex-1 min-w-0 text-[13.5px] font-medium truncate',
-                                                                isClosing
-                                                                    ? 'text-zinc-400 line-through'
-                                                                    : 'text-zinc-800'
-                                                            )}
-                                                        >
-                                                            {task.title}
-                                                        </span>
-
-                                                        <span
-                                                            className="text-[11px] font-semibold px-2 py-0.5 rounded-md shrink-0 tabular-nums"
-                                                            style={
-                                                                group === 'overdue'
-                                                                    ? { backgroundColor: '#fff1f2', color: OVERDUE }
-                                                                    : { backgroundColor: '#fafafa', color: '#a1a1aa' }
-                                                            }
-                                                        >
-                                                            {task.dueLabel ?? '—'}
-                                                        </span>
-
-                                                        <span className="hidden sm:flex items-center gap-1.5 w-16 shrink-0 text-[11px] text-zinc-400">
-                                                            <ListDot list={task.list} />
-                                                            <span className="truncate">
-                                                                {task.list ? TASK_LISTS[task.list].label : '—'}
-                                                            </span>
-                                                        </span>
-
-                                                        <button
-                                                            onClick={() => void begin(task)}
-                                                            aria-label={`Start a focus session on ${task.title}`}
-                                                            className={cn(
-                                                                'w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-all',
-                                                                isFocused
-                                                                    ? 'bg-zinc-900 text-white'
-                                                                    : 'text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 sm:opacity-0 sm:group-hover/row:opacity-100 focus-visible:opacity-100'
-                                                            )}
-                                                        >
-                                                            <Play className="w-2.5 h-2.5 fill-current" />
-                                                        </button>
-
-                                                        {/* Furthest from the tick on purpose. Both buttons close the
-                                                            row, and they are the one pair here where hitting the wrong
-                                                            one writes the wrong history — so they sit at opposite ends
-                                                            with the whole row between them. Zinc, not rose: rose means
-                                                            overdue everywhere else in this panel, and deciding not to
-                                                            do something is a decision, not an alarm. */}
-                                                        <button
-                                                            onClick={() => void close(task, 'wont-do')}
-                                                            disabled={isClosing}
-                                                            aria-label={`Mark ${task.title} as won’t do`}
-                                                            title="Won’t do"
-                                                            className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-all text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-40 sm:opacity-0 sm:group-hover/row:opacity-100 focus-visible:opacity-100"
-                                                        >
-                                                            <Ban className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                );
-                                            })}
+                                            {items.map((task) => (
+                                                <TaskRow
+                                                    key={task.id}
+                                                    task={task}
+                                                    outcome={closing.get(task.id)}
+                                                    isFocused={session?.taskId === task.id}
+                                                    onComplete={() => void close(task, 'complete')}
+                                                    onWontDo={() => void close(task, 'wont-do')}
+                                                    onBegin={() => void begin(task)}
+                                                />
+                                            ))}
                                         </div>
                                     ))
                                 )}
@@ -1061,5 +1043,163 @@ export default function FloatingTasks({ isAuthed, onRequestUnlock }: FloatingTas
                 )}
             </AnimatePresence>
         </>
+    );
+}
+
+/* -------------------------------------------------------------------------- task rows */
+
+interface TaskRowProps {
+    task: PanelTask;
+    /** Set while a close is in flight; which one decides the glyph in the ring. */
+    outcome: TaskOutcome | undefined;
+    isFocused: boolean;
+    onComplete: () => void;
+    onWontDo: () => void;
+    onBegin: () => void;
+    /** Priority view only: the 1-based slot, and the grip that drags it. */
+    position?: number;
+    handle?: ReactNode;
+}
+
+function TaskRow({ task, outcome, isFocused, onComplete, onWontDo, onBegin, position, handle }: TaskRowProps) {
+    const isClosing = outcome !== undefined;
+    const overdue = task.group === 'overdue';
+
+    return (
+        <div
+            className={cn(
+                'group/row flex items-center gap-3 px-6 py-2.5 border-t border-zinc-50 transition-colors',
+                isFocused ? 'bg-zinc-50' : 'hover:bg-zinc-50/60'
+            )}
+        >
+            {handle}
+
+            {position !== undefined && (
+                <span className="w-4 shrink-0 text-right text-[11px] font-semibold tabular-nums text-zinc-300">
+                    {position}
+                </span>
+            )}
+
+            {/* The ring doubles as the in-flight indicator, and which glyph
+                lands in it is the only thing distinguishing the two ways a
+                row can be leaving: filled dark with a tick for done, muted
+                with a cross for written off. */}
+            <button
+                onClick={onComplete}
+                disabled={isClosing}
+                aria-label={`Complete ${task.title}`}
+                className={cn(
+                    'w-[19px] h-[19px] shrink-0 rounded-full border-2 flex items-center justify-center transition-colors',
+                    outcome === 'complete'
+                        ? 'bg-zinc-900 border-zinc-900 text-white'
+                        : outcome === 'wont-do'
+                          ? 'bg-zinc-300 border-zinc-300 text-white'
+                          : 'hover:bg-zinc-100'
+                )}
+                style={isClosing ? undefined : { borderColor: PRIORITY_RINGS[task.priority] ?? PRIORITY_RINGS[0] }}
+            >
+                {outcome === 'complete' && <Check className="w-2.5 h-2.5" strokeWidth={4} />}
+                {outcome === 'wont-do' && <X className="w-2.5 h-2.5" strokeWidth={4} />}
+            </button>
+
+            <span
+                className={cn(
+                    'flex-1 min-w-0 text-[13.5px] font-medium truncate',
+                    isClosing ? 'text-zinc-400 line-through' : 'text-zinc-800'
+                )}
+            >
+                {task.title}
+            </span>
+
+            <span
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-md shrink-0 tabular-nums"
+                style={
+                    overdue
+                        ? { backgroundColor: '#fff1f2', color: OVERDUE }
+                        : { backgroundColor: '#fafafa', color: '#a1a1aa' }
+                }
+            >
+                {task.dueLabel ?? '—'}
+            </span>
+
+            <span className="hidden sm:flex items-center gap-1.5 w-16 shrink-0 text-[11px] text-zinc-400">
+                <ListDot list={task.list} />
+                <span className="truncate">{task.list ? TASK_LISTS[task.list].label : '—'}</span>
+            </span>
+
+            <button
+                onClick={onBegin}
+                aria-label={`Start a focus session on ${task.title}`}
+                className={cn(
+                    'w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-all',
+                    isFocused
+                        ? 'bg-zinc-900 text-white'
+                        : 'text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 sm:opacity-0 sm:group-hover/row:opacity-100 focus-visible:opacity-100'
+                )}
+            >
+                <Play className="w-2.5 h-2.5 fill-current" />
+            </button>
+
+            {/* Furthest from the tick on purpose. Both buttons close the
+                row, and they are the one pair here where hitting the wrong
+                one writes the wrong history — so they sit at opposite ends
+                with the whole row between them. Zinc, not rose: rose means
+                overdue everywhere else in this panel, and deciding not to
+                do something is a decision, not an alarm. */}
+            <button
+                onClick={onWontDo}
+                disabled={isClosing}
+                aria-label={`Mark ${task.title} as won’t do`}
+                title="Won’t do"
+                className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center transition-all text-zinc-300 hover:bg-zinc-100 hover:text-zinc-600 disabled:opacity-40 sm:opacity-0 sm:group-hover/row:opacity-100 focus-visible:opacity-100"
+            >
+                <Ban className="w-3 h-3" />
+            </button>
+        </div>
+    );
+}
+
+/**
+ * The same row, draggable.
+ *
+ * `dragListener={false}` with explicit controls, so the drag can only start on the grip: the
+ * row is mostly buttons, and a press-and-move anywhere else would mean picking up a task
+ * every time a cursor slipped on the way to the tick.
+ */
+function DraggableTaskRow({ onNudge, ...row }: TaskRowProps & { onNudge: (delta: number) => void }) {
+    const controls = useDragControls();
+
+    return (
+        <Reorder.Item
+            as="div"
+            value={row.task}
+            dragListener={false}
+            dragControls={controls}
+            className="relative bg-white"
+            whileDrag={{ scale: 1.01, boxShadow: '0 12px 28px rgba(24,24,27,0.14)', zIndex: 2 }}
+        >
+            <TaskRow
+                {...row}
+                handle={
+                    <button
+                        // touch-none, or the browser claims the gesture for scrolling and the
+                        // row never moves on a phone.
+                        onPointerDown={(e) => {
+                            e.preventDefault();
+                            controls.start(e);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+                            e.preventDefault();
+                            onNudge(e.key === 'ArrowUp' ? -1 : 1);
+                        }}
+                        aria-label={`Reorder ${row.task.title} — arrow keys move it`}
+                        className="-ml-1.5 w-5 h-7 shrink-0 flex items-center justify-center rounded-md text-zinc-300 hover:text-zinc-600 hover:bg-zinc-100 cursor-grab active:cursor-grabbing touch-none transition-colors"
+                    >
+                        <GripVertical className="w-3.5 h-3.5" />
+                    </button>
+                }
+            />
+        </Reorder.Item>
     );
 }

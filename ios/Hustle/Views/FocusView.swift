@@ -8,7 +8,7 @@ struct FocusView: View {
     @Binding var showLockMode: Bool
     @State private var newTitle = ""
     @State private var newList = "work"
-    @State private var filterToday = false
+    @State private var queueFilter: QueueFilter = .all
     @FocusState private var composing: Bool
 
     private var round: Round? { focus.engine.current }
@@ -33,16 +33,56 @@ struct FocusView: View {
 
     // MARK: Header
 
+    /// "8 in queue · synced 2m ago" — the sync half matters because the order can be set on
+    /// the dashboard, and a stale queue looks exactly like a correct one.
+    private var statusLine: String {
+        var parts: [String] = []
+        if let round { parts.append("Pomodoro · \(Int(round.remainingMs).clockString) left") }
+        parts.append("\(focus.engine.tasks.count) in queue")
+        parts.append(syncLabel)
+        return parts.joined(separator: " · ")
+    }
+
+    private var syncLabel: String {
+        if focus.syncing { return "Syncing…" }
+        guard let at = focus.lastSyncedAt else { return "Not synced yet" }
+        let seconds = Int(Date().timeIntervalSince(at))
+        if seconds < 60 { return "Synced just now" }
+        if seconds < 3600 { return "Synced \(seconds / 60)m ago" }
+        return "Synced \(seconds / 3600)h ago"
+    }
+
     private var header: some View {
         HStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Focus").font(.system(size: 28, weight: .bold, design: .serif)).tracking(-0.5)
-                Theme.label(round == nil
-                            ? "\(focus.engine.tasks.count) in queue"
-                            : "Pomodoro · \(Int(round!.remainingMs).clockString) left · \(focus.engine.tasks.count) in queue",
-                            color: Theme.muted)
+                Theme.label(statusLine, color: Theme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
-            Spacer()
+            Spacer(minLength: 8)
+
+            // A spinner rather than a spun icon: the button is disabled while it runs, and a
+            // rotating glyph on a disabled control reads as decoration.
+            Button {
+                Task { await focus.syncNow() }
+            } label: {
+                Group {
+                    if focus.syncing {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.ink)
+                    }
+                }
+                .frame(width: 34, height: 34)
+                .background(.white, in: Circle())
+                .overlay(Circle().stroke(Theme.hairline))
+            }
+            .accessibilityLabel("Sync now")
+            .disabled(focus.syncing || !session.isAuthed)
+
             Button {
                 if round == nil { focus.start() }
                 showLockMode = true
@@ -116,29 +156,66 @@ struct FocusView: View {
 
     // MARK: Queue
 
-    private var visibleTasks: [QueuedTask] {
-        filterToday ? focus.engine.tasks.filter { $0.group == "today" || $0.group == "overdue" } : focus.engine.tasks
+    private func tasks(for filter: QueueFilter) -> [QueuedTask] {
+        switch filter {
+        case .all: return focus.engine.tasks
+        case .today: return focus.engine.tasks.filter { $0.group == "today" || $0.group == "overdue" }
+        case .list(let key): return focus.engine.tasks.filter { $0.list == key }
+        }
     }
+
+    private var visibleTasks: [QueuedTask] { tasks(for: queueFilter) }
 
     private var queueHeader: some View {
-        HStack {
-            Theme.label("Queue · drag to reorder")
-            Spacer()
-            HStack(spacing: 2) {
-                filterPill("All", on: !filterToday) { filterToday = false }
-                filterPill("Today", on: filterToday) { filterToday = true }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Theme.label("Queue · drag to reorder")
+                Spacer()
+                if queueFilter != .all {
+                    Theme.label("\(visibleTasks.count) shown", color: Theme.faint)
+                }
             }
-            .padding(2).background(.white, in: Capsule()).overlay(Capsule().stroke(Theme.hairline))
+
+            // One scrolling row rather than two stacked ones: All/Today and the four lists are
+            // the same question — which slice of the queue am I looking at — and two rows of
+            // pills that can both be "on" invite the reading that they combine.
+            // The explicit height is load-bearing: a horizontal ScrollView is still flexible
+            // vertically, so in this column it would grow into the queue below it.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(QueueFilter.options, id: \.self) { filter in
+                        filterPill(filter)
+                    }
+                }
+            }
+            .frame(height: 28)
         }
     }
 
-    private func filterPill(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title).font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(on ? .white : Theme.muted)
-                .padding(.horizontal, 9).frame(height: 18)
-                .background(on ? Theme.ink : .clear, in: Capsule())
+    private func filterPill(_ filter: QueueFilter) -> some View {
+        let on = filter == queueFilter
+        // The tag pills carry their list colour so the row matches the chips on the cards; the
+        // two time filters stay black, which is what tells the two kinds apart at a glance.
+        let tint = filter.tint ?? Theme.ink
+        let count = tasks(for: filter).count
+
+        return Button { queueFilter = filter } label: {
+            HStack(spacing: 5) {
+                if let colour = filter.tint {
+                    Circle().fill(on ? Color.white.opacity(0.85) : colour).frame(width: 5, height: 5)
+                }
+                Text(filter.title)
+                Text("\(count)").monospacedDigit().opacity(0.6)
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(on ? .white : Theme.muted)
+            .padding(.horizontal, 10).frame(height: 26)
+            .background(on ? tint : .white, in: Capsule())
+            .overlay(Capsule().stroke(on ? .clear : Theme.hairline))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(filter.title), \(count) tasks")
+        .accessibilityAddTraits(on ? [.isSelected] : [])
     }
 
     private var queueList: some View {
@@ -161,13 +238,14 @@ struct FocusView: View {
                     }
             }
             .onMove { from, to in
-                guard !filterToday else { return }   // reorder only over the full queue
-                focus.move(fromOffsets: from, toOffset: to)
+                focus.move(visibleIds: visibleTasks.map(\.id), fromOffsets: from, toOffset: to)
             }
             if focus.loadingTasks && focus.engine.tasks.isEmpty {
                 ProgressView().frame(maxWidth: .infinity).listRowBackground(Color.clear).listRowSeparator(.hidden)
-            } else if focus.engine.tasks.isEmpty {
-                Text(session.isAuthed ? "Queue is empty — add a task below." : "Unlock to load your tasks.")
+            } else if visibleTasks.isEmpty {
+                Text(session.isAuthed
+                     ? (focus.engine.tasks.isEmpty ? "Queue is empty — add a task below." : "Nothing under \(queueFilter.title).")
+                     : "Unlock to load your tasks.")
                     .font(.system(size: 13)).foregroundStyle(Theme.faint)
                     .frame(maxWidth: .infinity).padding(.top, 20)
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -176,7 +254,7 @@ struct FocusView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .environment(\.editMode, .constant(.active))   // always show drag handles
-        .refreshable { await focus.loadTasks() }
+        .refreshable { await focus.syncNow() }
     }
 
     // MARK: Composer
@@ -222,6 +300,30 @@ struct FocusView: View {
         guard session.isAuthed else { session.showUnlock = true; return }
         newTitle = ""
         Task { await focus.addTask(title: title, list: newList) }
+    }
+}
+
+/// What the Focus queue is filtered to. The two time filters and the four lists are one
+/// single-choice row: a task is in exactly one list, and "Today" is a slice across all of them.
+enum QueueFilter: Hashable {
+    case all
+    case today
+    case list(String)
+
+    static let options: [QueueFilter] = [.all, .today, .list("work"), .list("study"), .list("hustle"), .list("life")]
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .today: return "Today"
+        case .list(let key): return ListPalette.label(for: key)
+        }
+    }
+
+    /// The list colour, or nil for the two time filters.
+    var tint: Color? {
+        if case .list(let key) = self { return ListPalette.color(for: key) }
+        return nil
     }
 }
 

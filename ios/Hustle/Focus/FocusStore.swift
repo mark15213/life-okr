@@ -11,6 +11,10 @@ final class FocusStore: ObservableObject {
     @Published var error: String?
     /// The round that just finished, for the "Done" moment in Lock mode.
     @Published var justCompleted: Round?
+    /// A manual sync is in flight (the button in the Focus header).
+    @Published private(set) var syncing = false
+    /// When the last manual or automatic full sync finished, for the header's "synced 2m ago".
+    @Published private(set) var lastSyncedAt: Date?
 
     private let api = APIClient.shared
     private var ticker: Timer?
@@ -19,6 +23,9 @@ final class FocusStore: ObservableObject {
     private var saveSessionTask: Task<Void, Never>?
     private var saveOrderTask: Task<Void, Never>?
     private var lastSavedSessionSignature = ""
+    /// True between a local reorder and its write landing — while it is, a pulled order is
+    /// older than what is on screen and must not be applied over it.
+    private var orderSavePending = false
     private let activity = FocusActivityManager()
 
     private static let pendingKey = "hustle.pendingFocusUploads"
@@ -57,10 +64,13 @@ final class FocusStore: ObservableObject {
             engine.syncTasks(tasks, now: now)
             let stored = try await api.readState("queue-order", as: QueueOrder.self)
             orderVersion = stored.version
-            if let order = stored.value?.order { engine.applyOrder(order) }
+            if let order = stored.value?.order, !orderSavePending { engine.applyOrder(order) }
             if engine.selectedId == nil, let first = engine.tasks.first { engine.selectedId = first.id }
             saveSnapshot()
             error = nil
+            // Counts for the header's "synced Xm ago" whether it was the button or the
+            // automatic pull on launch that got here.
+            lastSyncedAt = Date()
         } catch APIClient.HTTPError.unauthorized {
             // Reads of the task list are gated too; the view shows the unlock prompt.
         } catch {
@@ -68,8 +78,24 @@ final class FocusStore: ObservableObject {
         }
     }
 
-    func move(fromOffsets: IndexSet, toOffset: Int) {
-        engine.move(fromOffsets: fromOffsets, toOffset: toOffset)
+    /// Reorder the rows the Focus screen is currently showing.
+    ///
+    /// Under a tag or Today filter those rows are a subset of the queue, so the new relative
+    /// order is written back into the slots that subset already occupies and everything else
+    /// keeps its place. Dragging the third Work task above the first therefore moves it above
+    /// that task in the full queue too, without disturbing the Study tasks in between.
+    func move(visibleIds: [String], fromOffsets: IndexSet, toOffset: Int) {
+        var reordered = visibleIds
+        reordered.move(fromOffsets: fromOffsets, toOffset: toOffset)
+
+        let affected = Set(visibleIds)
+        let byId = Dictionary(engine.tasks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var filled = reordered.makeIterator()
+        engine.tasks = engine.tasks.map { task in
+            guard affected.contains(task.id), let id = filled.next(), let moved = byId[id] else { return task }
+            return moved
+        }
+
         // Dragging something to the top makes it the task being worked on.
         if let first = engine.tasks.first, first.id != engine.selectedId {
             engine.select(first.id, now: now)
@@ -78,7 +104,37 @@ final class FocusStore: ObservableObject {
         scheduleSaveOrder()
     }
 
+    /// Adopt a priority order set elsewhere — normally the web dashboard's All tab, which
+    /// writes the same `queue-order` key. Cheap enough to call on every foreground: the
+    /// version has not moved unless someone actually reordered.
+    func pullOrder() async {
+        guard !orderSavePending else { return }
+        do {
+            let stored = try await api.readState("queue-order", as: QueueOrder.self)
+            guard stored.version != orderVersion else { return }
+            orderVersion = stored.version
+            guard let order = stored.value?.order else { return }
+            engine.applyOrder(order)
+            saveSnapshot()
+        } catch {
+            // Silent: a failed poll must not reshuffle a queue that is being worked down.
+        }
+    }
+
+    /// Everything the Focus header's sync button does: the task list and the shared order, the
+    /// pomodoro another device may be running, and any focus record that failed to upload.
+    func syncNow() async {
+        guard !syncing else { return }
+        syncing = true
+        defer { syncing = false }
+        await loadTasks()
+        await pullSession()
+        await flushUploads()
+        if error == nil { lastSyncedAt = Date() }
+    }
+
     private func scheduleSaveOrder() {
+        orderSavePending = true
         saveOrderTask?.cancel()
         saveOrderTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(600))
@@ -88,6 +144,7 @@ final class FocusStore: ObservableObject {
     }
 
     private func saveOrder() async {
+        defer { orderSavePending = false }
         let order = QueueOrder(order: engine.tasks.map(\.id))
         do {
             let written = try await api.writeState("queue-order", value: order, ifVersion: orderVersion)
