@@ -15,6 +15,9 @@ final class FocusStore: ObservableObject {
     @Published private(set) var syncing = false
     /// When the last manual or automatic full sync finished, for the header's "synced 2m ago".
     @Published private(set) var lastSyncedAt: Date?
+    /// Bumped once focus records have landed and the dashboard's totals have been rebuilt,
+    /// so the cards can re-fetch and show the round that just finished.
+    @Published private(set) var dashboardResyncedAt: Date?
 
     private let api = APIClient.shared
     private var ticker: Timer?
@@ -305,16 +308,34 @@ final class FocusStore: ObservableObject {
         var pending = loadPending()
         guard !pending.isEmpty else { return }
         var remaining: [PendingUpload] = []
+        var uploaded = false
         for item in pending {
             do {
                 try await api.uploadFocus(sessionId: item.sessionId, taskId: item.taskId, title: item.title,
                                           startedAt: item.startedAt, endedAt: item.endedAt)
+                uploaded = true
             } catch {
                 remaining.append(item)
             }
         }
         pending = remaining
         savePending(pending)
+        if uploaded { await resyncDashboard() }
+    }
+
+    /// An upload only reaches TickTick; the dashboard's own daily totals are rebuilt by a
+    /// second call, which is what the web panel and the desktop client do too. Without it a
+    /// pomodoro finished here stays off the board until another machine happens to sync.
+    ///
+    /// Quiet on failure on purpose: the focus itself is already safely in TickTick, so the
+    /// worst case is a number that is briefly stale — not worth an error banner.
+    private func resyncDashboard() async {
+        do {
+            try await api.resyncDashboard()
+            dashboardResyncedAt = Date()
+        } catch {
+            // Offline, or the cookie expired. The next flush or foreground will retry.
+        }
     }
 
     private func loadPending() -> [PendingUpload] {

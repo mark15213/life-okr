@@ -162,6 +162,19 @@ final class APIClient {
                               as: Reply.self)
     }
 
+    /// Recompute the dashboard's stored daily totals from TickTick.
+    ///
+    /// `/api/ticktick/focus` only writes the session into TickTick; the numbers the cards
+    /// read come off the dashboard's own rows, and those are only rebuilt here. The web
+    /// panel and the desktop client both call this straight after an upload — without it a
+    /// pomodoro finished on the phone sits invisible until some other machine syncs.
+    ///
+    /// Safe to call repeatedly: the endpoint recomputes and overwrites rather than adding.
+    func resyncDashboard() async throws {
+        struct Reply: Decodable {}
+        _ = try await request("POST", "/api/ticktick/sync", as: Reply.self)
+    }
+
     // MARK: Vault
 
     func vaultPurchases() async throws -> [VaultPurchase] {

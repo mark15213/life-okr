@@ -34,6 +34,12 @@ struct HustleApp: App {
                         await focus.flushUploads()
                     }
                 }
+                .onChange(of: focus.dashboardResyncedAt) { _, stamp in
+                    // A finished pomodoro has reached TickTick and the dashboard's totals
+                    // have been rebuilt, so today's focus number is now worth re-reading.
+                    guard stamp != nil else { return }
+                    Task { await dashboard.refresh() }
+                }
                 .onChange(of: session.isAuthed) { _, authed in
                     guard authed else { return }
                     Task { await focus.loadTasks(); await focus.pullSession() }
