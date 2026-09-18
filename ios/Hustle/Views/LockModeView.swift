@@ -21,9 +21,11 @@ struct LockModeView: View {
 
             VStack(spacing: 0) {
                 clockHeader.padding(.top, 20)
-                previousPill.padding(.top, 30)
-                ringAndTask.padding(.top, 10)
-                upNext.padding(.top, 26)
+                Spacer(minLength: 24)
+                ringAndTask
+                if !engine.queue(limit: 1).isEmpty {
+                    upNext.padding(.top, 32)
+                }
                 Spacer(minLength: 0)
                 controls
             }
@@ -31,6 +33,17 @@ struct LockModeView: View {
             .padding(.bottom, 12)
         }
         .preferredColorScheme(.dark)
+        .overlay(alignment: .topLeading) {
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Theme.faint)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("Back to Focus")
+            .padding(.leading, 12)
+        }
         .statusBarHidden(true)
         .contentShape(Rectangle())
         .gesture(swipe)
@@ -44,32 +57,11 @@ struct LockModeView: View {
     private var clockHeader: some View {
         VStack(spacing: 6) {
             Text(clock.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()))
-                .font(.system(size: 64, weight: .light)).tracking(-2.5).monospacedDigit()
+                .font(.system(size: 42, weight: .light)).tracking(-1.5).monospacedDigit()
             Text(clock.formatted(.dateTime.weekday(.wide).month(.wide).day()).uppercased())
                 .font(.system(size: 11, weight: .semibold)).tracking(1.6).foregroundStyle(Theme.muted)
         }
         .foregroundStyle(Color(hex: 0xFAFAFA))
-    }
-
-    @ViewBuilder
-    private var previousPill: some View {
-        if let prev = engine.previousInQueue {
-            Button { focus.previous() } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "chevron.up").font(.system(size: 10, weight: .bold))
-                    Text(prev.title).lineLimit(1)
-                    Text(Int(round?.totals()[prev.id] ?? 0).shortClockString).foregroundStyle(Color(hex: 0x52525B)).monospacedDigit()
-                }
-                .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.faint)
-                .padding(.horizontal, 14).frame(height: 40)
-                .background(Color(hex: 0x27272A).opacity(0.5), in: Capsule())
-                .overlay(Capsule().stroke(Color(hex: 0x27272A)))
-            }
-            .frame(maxWidth: 320)
-        } else {
-            Text("TOP OF QUEUE").font(.system(size: 11, weight: .semibold)).tracking(1.2)
-                .foregroundStyle(Color(hex: 0x3F3F46)).frame(height: 40)
-        }
     }
 
     private var ringAndTask: some View {
@@ -82,15 +74,11 @@ struct LockModeView: View {
                     Text(Int(round?.remainingMs ?? engine.durationMs).clockString)
                         .font(.system(size: 56, weight: .light)).tracking(-2.2).monospacedDigit()
                         .foregroundStyle(Color(hex: 0xFAFAFA))
-                    Text("left of \(Int(engine.durationMs).clockString)")
-                        .font(.system(size: 11)).foregroundStyle(Color(hex: 0x52525B)).monospacedDigit()
                 }
             }
             .frame(width: 232, height: 232)
 
             VStack(spacing: 8) {
-                Text("WORKING ON").font(.system(size: 10, weight: .semibold)).tracking(1.8)
-                    .foregroundStyle(ListPalette.color(for: engine.selected?.list).opacity(0.9))
                 Text(engine.selected?.title ?? "Queue is empty")
                     .font(.system(size: 22, weight: .semibold)).tracking(-0.2)
                     .foregroundStyle(Color(hex: 0xFAFAFA))
@@ -102,15 +90,14 @@ struct LockModeView: View {
                 if let sel = engine.selected {
                     HStack(spacing: 8) {
                         darkChip(sel.list)
-                        Text("\(Int(round?.totals()[sel.id] ?? 0).shortClockString) on this task")
+                        Text(Int(round?.totals()[sel.id] ?? 0).shortClockString)
                             .font(.system(size: 11)).foregroundStyle(Theme.muted).monospacedDigit()
+                            .accessibilityLabel("Time on this task: \(Int(round?.totals()[sel.id] ?? 0).shortClockString)")
                     }
                 }
             }
             .frame(maxWidth: 320)
 
-            RoundLegend(round: round, tasks: engine.tasks, textColor: Theme.faint)
-                .frame(maxWidth: 320)
         }
         .animation(.spring(duration: 0.28), value: engine.selectedId)
     }
@@ -123,7 +110,7 @@ struct LockModeView: View {
                 Button { focus.next() } label: {
                     HStack(spacing: 4) {
                         Text("SWIPE UP")
-                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                        Image(systemName: "chevron.up").font(.system(size: 9, weight: .bold))
                     }
                     .font(.system(size: 10, weight: .semibold)).tracking(1).foregroundStyle(Theme.muted)
                 }
@@ -131,15 +118,12 @@ struct LockModeView: View {
             }
             .padding(.horizontal, 4).padding(.bottom, 6)
 
-            ForEach(Array(engine.queue(limit: 3).enumerated()), id: \.element.id) { i, t in
+            ForEach(Array(engine.queue(limit: 2).enumerated()), id: \.element.id) { i, t in
                 Button { focus.select(t.id) } label: {
                     HStack(spacing: 12) {
-                        Text(String((engine.tasks.firstIndex(of: t) ?? i) + 1))
-                            .font(.system(size: 11, weight: .semibold)).monospacedDigit()
-                            .foregroundStyle(Color(hex: 0x52525B)).frame(width: 14)
+                        Circle().fill(ListPalette.color(for: t.list)).frame(width: 5, height: 5)
                         Text(t.title).font(.system(size: 14, weight: .medium)).foregroundStyle(Color(hex: 0xD4D4D8)).lineLimit(1)
                         Spacer()
-                        Text(subtitle(for: t)).font(.system(size: 12)).foregroundStyle(Theme.muted).monospacedDigit()
                     }
                     .padding(.horizontal, 12).frame(height: 44)
                 }
@@ -148,23 +132,8 @@ struct LockModeView: View {
         }
     }
 
-    private func subtitle(for t: QueuedTask) -> String {
-        let ms = Int(round?.totals()[t.id] ?? 0)
-        if ms > 0 { return "\(ms.shortClockString) this pomo" }
-        return t.dueLabel ?? "not started"
-    }
-
     private var controls: some View {
         HStack {
-            Button { dismiss() } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "lock.open").font(.system(size: 12))
-                    Text("Unlock")
-                }
-                .font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.faint)
-                .padding(.horizontal, 14).frame(height: 40)
-                .overlay(Capsule().stroke(Color(hex: 0x27272A)))
-            }
             Spacer()
             HStack(spacing: 10) {
                 Button { focus.toggle() } label: {
@@ -185,6 +154,7 @@ struct LockModeView: View {
                 .accessibilityLabel("Mark done")
                 .disabled(engine.selected == nil)
             }
+            Spacer()
         }
     }
 
